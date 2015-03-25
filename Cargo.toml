@@ -1,0 +1,5 @@
+[package]
+
+name = "machine"
+version = "0.0.1"
+authors = ["Geoffroy Couprie <contact@geoffroycouprie.com>"]

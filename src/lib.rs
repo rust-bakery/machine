@@ -72,15 +72,31 @@ macro_rules! state_impl (
 
 #[macro_export]
 macro_rules! transitions_impl (
+  ($machine:ident, $state:ident, $name:ident ( $( $arg:ident : $t:ty ),* ) => $next:ident $b:block; $($rest:tt)* ) => (
+    pub fn $name(&self,  $( $arg : $t ),* ) -> $machine<$next> {
+      let res = $b;
+      return $machine {
+        state: res
+      }
+    }
+  );
   ($machine:ident, $state:ident, $name:ident => $next:ident; $($rest:tt)* ) => (
     pub fn $name(&self) -> $machine<$next> {
        return $machine {
          state: $next
        }
     }
-
+  );
+  ($machine:ident, $state:ident, $name:ident => $next:ident $b:block; $($rest:tt)* ) => (
+    pub fn $name(&self) -> $machine<$next> {
+      let res = $b;
+      return $machine {
+        state: res
+      }
+    }
   );
 );
+
 #[cfg(test)]
 mod tests {
   #![feature(trace_macros)]
@@ -88,13 +104,22 @@ mod tests {
 
   trace_macros!(true);
   machine!(Machine {
-    SA {
+    SA { } => {
+      tr1(a:u8) => SB
+      {
+        println!("current: {}", a);
+        SB { b: a, c: false }
+      };
 
     };
 
     SB {
       b: u8,
       c: bool
+    } => {
+      tr3 => SA {
+        SA
+      };
     };
 
     SC {
@@ -105,4 +130,12 @@ mod tests {
   });
   trace_macros!(false);
 
+  #[test]
+  fn transitions() {
+    let m = Machine { state: SB { b: 1, c: true } };
+    let m = m.tr3();
+    assert_eq!(m, Machine { state: SA });
+    let m = m.tr1(42);
+    assert_eq!(m, Machine { state: SB { b:42, c:false } });
+  }
 }

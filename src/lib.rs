@@ -7,6 +7,10 @@ macro_rules! machine (
         $($name:ident : $t:ty),*
       }
 
+      impl {
+        $($funs:item)*
+      }
+
       states {
         $($states:tt)*
       }
@@ -16,6 +20,10 @@ macro_rules! machine (
     pub struct $machine<T> {
       state: T,
       $($name : $t),*
+    }
+
+    impl<T> $machine<T> {
+    //  $($funs)*
     }
 
     state_impl!($machine, { $($name),* }, $($states)* );
@@ -126,6 +134,16 @@ mod tests {
       counter: u8
     }
 
+    impl {
+      /*pub fn inc() {
+        //self.counter = self.counter + 1
+      }
+      pub fn cnt() -> u8 {
+        //self.counter
+        1
+      }*/
+    }
+
     states {
 
       SA { } => {
@@ -157,6 +175,14 @@ mod tests {
   });
   trace_macros!(false);
 
+    impl<T> Machine<T> {
+      pub fn inc(&mut self) {
+        self.counter = self.counter + 1
+      }
+      pub fn cnt(&self) -> u8 {
+        self.counter
+      }
+    }
   #[test]
   fn transitions() {
     let m = Machine { state: SB { b: 1, c: true }, counter: 0 };

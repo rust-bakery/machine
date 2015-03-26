@@ -72,7 +72,36 @@ macro_rules! state_impl (
 
 #[macro_export]
 macro_rules! transitions_impl (
+  ($machine:ident, $state:ident,) => (
+  );
+
   ($machine:ident, $state:ident, $name:ident ( $( $arg:ident : $t:ty ),* ) => $next:ident $b:block; $($rest:tt)* ) => (
+    trans_impl!($machine, $state, $name ( $( $arg : $t ),* ) => $next $b;);
+    transitions_impl!($machine, $state, $($rest)*);
+  );
+  ($machine:ident, $state:ident, $name:ident => $next:ident; $($rest:tt)* ) => (
+
+    trans_impl!($machine, $state, $name => $next;);
+    transitions_impl!($machine, $state, $($rest)*);
+  );
+  ($machine:ident, $state:ident, $name:ident => $next:ident $b:block; $($rest:tt)* ) => (
+
+    trans_impl!($machine, $state, $name  => $next $b;);
+    transitions_impl!($machine, $state, $($rest)*);
+  );
+
+);
+
+#[macro_export]
+macro_rules! trans_impl (
+  ($machine:ident, $state:ident, $name:ident => $next:ident;) => (
+    pub fn $name(&self) -> $machine<$next> {
+      return $machine {
+        state: $next
+      }
+    }
+  );
+  ($machine:ident, $state:ident, $name:ident ( $( $arg:ident : $t:ty ),* ) => $next:ident $b:block; ) => (
     pub fn $name(&self,  $( $arg : $t ),* ) -> $machine<$next> {
       let res = $b;
       return $machine {
@@ -80,14 +109,7 @@ macro_rules! transitions_impl (
       }
     }
   );
-  ($machine:ident, $state:ident, $name:ident => $next:ident; $($rest:tt)* ) => (
-    pub fn $name(&self) -> $machine<$next> {
-       return $machine {
-         state: $next
-       }
-    }
-  );
-  ($machine:ident, $state:ident, $name:ident => $next:ident $b:block; $($rest:tt)* ) => (
+  ($machine:ident, $state:ident, $name:ident => $next:ident $b:block;) => (
     pub fn $name(&self) -> $machine<$next> {
       let res = $b;
       return $machine {
@@ -96,7 +118,6 @@ macro_rules! transitions_impl (
     }
   );
 );
-
 #[cfg(test)]
 mod tests {
   #![feature(trace_macros)]
@@ -117,6 +138,7 @@ mod tests {
       b: u8,
       c: bool
     } => {
+      tr2 => SC;
       tr3 => SA {
         SA
       };
@@ -137,5 +159,7 @@ mod tests {
     assert_eq!(m, Machine { state: SA });
     let m = m.tr1(42);
     assert_eq!(m, Machine { state: SB { b:42, c:false } });
+    let m = m.tr2().tr1();
+    assert_eq!(m, Machine { state: SA });
   }
 }

@@ -4,12 +4,6 @@
 macro_rules! machine (
   ( $machine:ident {
       $($rest:tt)*
-      //$($state_def:tt)*
-      /*$($state:ident {
-        //$($args:tt)*
-        $args:tt
-      };)*
-      */
     }
   ) => (
     #[derive(PartialEq,Eq,Debug)]
@@ -18,14 +12,6 @@ macro_rules! machine (
     }
 
     state_impl!($machine, $($rest)* );
-    //$(
-    //state_impl!($machine, $state_def);
-    //state_impl!($machine, $state { $args } );
-    //)*
-    /*$(
-       #[derive(PartialEq,Eq,Debug)]
-       pub struct $state { $($args)* };
-    )* */
   )
 );
 

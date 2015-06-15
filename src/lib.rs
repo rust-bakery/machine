@@ -1,7 +1,7 @@
 #![feature(trace_macros)]
 
 #[macro_export]
-macro_rules! machine (
+macro_rules! static_machine (
   ( $machine:ident {
       attributes {
         $($name:ident : $t:ty),*
@@ -26,21 +26,21 @@ macro_rules! machine (
     //  $($funs)*
     }
 
-    state_impl!($machine, { $($name),* }, $($states)* );
+    static_state_impl!($machine, { $($name),* }, $($states)* );
   )
 );
 
 #[macro_export]
-macro_rules! state_impl (
+macro_rules! static_state_impl (
   ($machine:ident, {$($field : ident),*}, $state:ident {  } => { $($transitions:tt)* }; $($rest:tt)* ) => (
     #[derive(PartialEq,Eq,Debug)]
     pub struct $state;
 
     impl $machine<$state> {
-      transitions_impl!($machine, $state, {$($field),*}, $($transitions)*);
+      static_transitions_impl!($machine, $state, {$($field),*}, $($transitions)*);
     }
 
-    state_impl!($machine, {$($field),*}, $($rest)*);
+    static_state_impl!($machine, {$($field),*}, $($rest)*);
   );
 
   ($machine:ident, {$($field : ident),*}, $state:ident { $($name:ident : $t:ty),* } => { $($transitions:tt)* }; $($rest:tt)*) => (
@@ -48,53 +48,53 @@ macro_rules! state_impl (
     pub struct $state { $($name : $t,)* }
 
     impl $machine<$state> {
-      transitions_impl!($machine, $state, {$($field),*}, $($transitions)*);
+      static_transitions_impl!($machine, $state, {$($field),*}, $($transitions)*);
     }
 
-    state_impl!($machine, {$($field),*}, $($rest)*);
+    static_state_impl!($machine, {$($field),*}, $($rest)*);
   );
 
   ($machine:ident, {$($field : ident),*}, $state:ident {  }; $($rest:tt)* ) => (
     #[derive(PartialEq,Eq,Debug)]
     pub struct $state;
 
-    state_impl!($machine, {$($field),*}, $($rest)*);
+    static_state_impl!($machine, {$($field),*}, $($rest)*);
   );
 
   ($machine:ident, {$($field : ident),*}, $state:ident { $($name:ident : $t:ty),* }; $($rest:tt)*) => (
     #[erive(PartialEq,Eq,Debug)]
     pub struct $state { $($name : $t,)* }
 
-    state_impl!($machine, {$($field),*}, $($rest)*);
+    static_state_impl!($machine, {$($field),*}, $($rest)*);
   );
 
   ($machine:ident, {$($field : ident),*}, ) =>  ( );
 );
 
 #[macro_export]
-macro_rules! transitions_impl (
+macro_rules! static_transitions_impl (
   ($machine:ident, $state:ident, {$($field : ident),*}, ) => (
   );
 
   ($machine:ident, $state:ident, {$($field : ident),*}, $name:ident ( $( $arg:ident : $t:ty ),* ) => $next:ident $b:block; $($rest:tt)* ) => (
-    trans_impl!($machine, $state, {$($field),*}, $name ( $( $arg : $t ),* ) => $next $b;);
-    transitions_impl!($machine, $state, {$($field),*}, $($rest)*);
+    static_trans_impl!($machine, $state, {$($field),*}, $name ( $( $arg : $t ),* ) => $next $b;);
+    static_transitions_impl!($machine, $state, {$($field),*}, $($rest)*);
   );
   ($machine:ident, $state:ident, {$($field : ident),*}, $name:ident => $next:ident; $($rest:tt)* ) => (
 
-    trans_impl!($machine, $state, {$($field),*}, $name => $next;);
-    transitions_impl!($machine, $state, {$($field),*}, $($rest)*);
+    static_trans_impl!($machine, $state, {$($field),*}, $name => $next;);
+    static_transitions_impl!($machine, $state, {$($field),*}, $($rest)*);
   );
   ($machine:ident, $state:ident, {$($field : ident),*}, $name:ident => $next:ident $b:block; $($rest:tt)* ) => (
 
-    trans_impl!($machine, $state, {$($field),*}, $name  => $next $b;);
-    transitions_impl!($machine, $state, {$($field),*}, $($rest)*);
+    static_trans_impl!($machine, $state, {$($field),*}, $name  => $next $b;);
+    static_transitions_impl!($machine, $state, {$($field),*}, $($rest)*);
   );
 
 );
 
 #[macro_export]
-macro_rules! trans_impl (
+macro_rules! static_trans_impl (
   ($machine:ident, $state:ident, {$($field : ident),*}, $name:ident => $next:ident;) => (
     pub fn $name(&self) -> $machine<$next> {
       return $machine {
@@ -129,7 +129,7 @@ mod tests {
   use super::*;
 
   trace_macros!(true);
-  machine!(Machine {
+  static_machine!(Machine {
     attributes {
       counter: u8
     }

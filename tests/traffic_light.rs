@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate machine;
 
-machine!(TrafficLight {
+static_machine!(TrafficLight {
   attributes {
     cars: u8
   }

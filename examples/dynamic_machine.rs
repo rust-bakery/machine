@@ -1,26 +1,20 @@
 /// State A    => {
 ///   tr1 => State B(x),
+///   tr4 => State A
 /// }
 ///
 /// State B(x) => {
 ///   tr2 => State C
 ///   tr3 => State A
+///   tr5 => State A -> u8
 /// }
 ///
 /// State C    => {
-///   tr4 => State A
+///   tr4     => State A
+///   tr6(u8) => State B
 /// }
 ///
 /// generates following interface
-
-/*
-#[derive(PartialEq,Eq,Debug)]
-pub struct SA;
-#[derive(PartialEq,Eq,Debug)]
-pub struct SB { b: u8 }
-#[derive(PartialEq,Eq,Debug)]
-pub struct SC;
-*/
 
 #[derive(PartialEq,Eq,Debug)]
 pub enum State {
@@ -58,7 +52,7 @@ impl Machine {
   fn tr2(&mut self) -> Option<()> {
     match self.state {
       State::SB(i) => {
-        println!("go to SC");
+        println!("{} =>go to SC", i);
         self.state = State::SC;
         Some(())
       },
@@ -69,10 +63,11 @@ impl Machine {
     }
   }
 
+  #[allow(dead_code)]
   fn tr3(&mut self) -> Option<()> {
     match self.state {
       State::SB(i) => {
-        println!("go to SA");
+        println!("{} => go to SA", i);
         self.state = State::SA;
         Some(())
       },
@@ -90,6 +85,39 @@ impl Machine {
         self.state = State::SA;
         Some(())
       },
+      State::SA => {
+        println!("stay in SA");
+        self.state = State::SA;
+        Some(())
+      },
+      _ => {
+        self.state = State::Error;
+        None
+      }
+    }
+  }
+
+  fn tr5(&mut self) -> Option<u8> {
+    match self.state {
+      State::SB(i) => {
+        println!("go to SA");
+        self.state = State::SA;
+        Some(i)
+      },
+      _ => {
+        self.state = State::Error;
+        None
+      }
+    }
+  }
+
+  fn tr6(&mut self, i: u8) -> Option<()> {
+    match self.state {
+      State::SC => {
+        println!("go to SB");
+        self.state = State::SB(i);
+        Some(())
+      },
       _ => {
         self.state = State::Error;
         None
@@ -105,6 +133,10 @@ fn main() {
   println!("machine: {:?}", m);
   m.tr2();
   println!("machine: {:?}", m);
+  m.tr6(42);
+  println!("machine: {:?}", m);
+  let a = m.tr5();
+  println!("machine: {:?} -> {:?}", m, a);
   m.tr4();
   println!("machine: {:?}", m);
 

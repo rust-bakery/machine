@@ -52,6 +52,7 @@ impl Machine<SB> {
     }
   }
 
+  #[allow(dead_code)]
   fn tr3(&self) -> Machine<SA> {
     println!("go to SA");
     return Machine {

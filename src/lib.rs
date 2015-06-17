@@ -1,12 +1,13 @@
-#![feature(trace_macros)]
+#![feature(log_syntax,trace_macros)]
 
 #[macro_export]
 macro_rules! machine (
   ( $machine:ident($state:ty) {
     $(
     event $ev:ident {
-      $($st:pat => $res:expr),*
-    })*
+      $($tokens:tt)*
+    }
+    )*
   }) => (
     #[derive(PartialEq,Eq,Debug)]
     struct $machine {
@@ -14,7 +15,11 @@ macro_rules! machine (
     }
 
     impl $machine {
-      $(transitions!($ev, $($st => $res),*);)*
+      $(transitions!(
+          $ev,
+          $($tokens)*
+        );
+      )*
     }
   )
 );
@@ -52,11 +57,6 @@ mod tests {
       State::A    => State::C(42)
     }
   });
-  //pub enum State {
- //   parse_states!(A(u8, u32), B);
-    //parse_states!(A, B, C);
-  //  Error,
-  //}
   trace_macros!(false);
 
   #[test]
@@ -75,14 +75,4 @@ mod tests {
     println!("state({:?}): {:?}", res, m);
     assert!(false);
   }
-  /*#[test]
-  fn transitions() {
-    let m = Machine { state: SB { b: 1, c: true }, counter: 0 };
-    let m = m.tr3();
-    assert_eq!(m, Machine { state: SA, counter: 0} );
-    let m = m.tr1(42);
-    assert_eq!(m, Machine { state: SB { b:42, c:false } , counter: 0 } );
-    let m = m.tr2().tr1();
-    assert_eq!(m, Machine { state: SA , counter: 0 } );
-  }*/
 }

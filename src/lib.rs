@@ -4,8 +4,7 @@
 macro_rules! machine (
   ( $machine:ident($state:ty) {
     event $ev:ident {
-      $state1:pat => $res1:expr,
-      $state2:pat => $res2:expr,
+      $($st:pat => $res:expr),*
     }
   }) => (
     #[derive(PartialEq,Eq,Debug)]
@@ -14,12 +13,17 @@ macro_rules! machine (
     }
 
     impl $machine {
-      fn $ev(&mut self) -> Option<()> {
-        match self.state {
-          $state1 => {self.state = $res1; Some(())},
-          $state2 => {self.state = $res2; Some(())},
-          _       => None
-        }
+      transitions!($ev, $($st => $res),*);
+    }
+  )
+);
+
+macro_rules! transitions (
+  ($ev:ident, $($state:pat => $res:expr),*) => (
+    fn $ev(&mut self) -> Option<()> {
+      match self.state {
+        $($state => {self.state = $res; Some(())},)*
+        _       => None
       }
     }
   )
@@ -39,7 +43,7 @@ mod tests {
   machine!(Machine(State) {
     event tr {
       State::A    => State::B(0),
-      State::B(i) => State::C(i+1),
+      State::B(i) => State::C(i+1)
     }
   });
   //pub enum State {

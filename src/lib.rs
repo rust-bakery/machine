@@ -3,9 +3,10 @@
 #[macro_export]
 macro_rules! machine (
   ( $machine:ident($state:ty) {
+    $(
     event $ev:ident {
       $($st:pat => $res:expr),*
-    }
+    })*
   }) => (
     #[derive(PartialEq,Eq,Debug)]
     struct $machine {
@@ -13,7 +14,7 @@ macro_rules! machine (
     }
 
     impl $machine {
-      transitions!($ev, $($st => $res),*);
+      $(transitions!($ev, $($st => $res),*);)*
     }
   )
 );
@@ -45,6 +46,11 @@ mod tests {
       State::A    => State::B(0),
       State::B(i) => State::C(i+1)
     }
+
+    event tr2 {
+      State::C(_) => State::A,
+      State::A    => State::C(42)
+    }
   });
   //pub enum State {
  //   parse_states!(A(u8, u32), B);
@@ -57,10 +63,16 @@ mod tests {
   fn a() {
     let mut m = Machine { state: State::A };
     println!("state: {:?}", m);
-    m.tr();
-    println!("state: {:?}", m);
-    m.tr();
-    println!("state: {:?}", m);
+    let mut res = m.tr();
+    println!("state({:?}): {:?}", res, m);
+    res = m.tr();
+    println!("state({:?}): {:?}", res, m);
+    res = m.tr();
+    println!("state({:?}): {:?}", res, m);
+    res = m.tr2();
+    println!("state({:?}): {:?}", res, m);
+    res = m.tr2();
+    println!("state({:?}): {:?}", res, m);
     assert!(false);
   }
   /*#[test]

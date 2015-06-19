@@ -32,7 +32,15 @@ macro_rules! transitions (
         _       => None
       }
     }
-  )
+  );
+  ($ev:ident, [ $err:expr]  $($state:pat => $res:expr),*) => (
+    fn $ev(&mut self) -> Option<()> {
+      match self.state {
+        $($state => {self.state = $res; Some(())},)*
+        _        => {self.state = $err; None}
+      }
+    }
+  );
 );
 
 #[cfg(test)]
@@ -42,19 +50,21 @@ mod tests {
 
   #[derive(PartialEq,Eq,Debug)]
   pub enum State {
-    A, B(u8), C(u8)
+    A, B(u8), C(u8), Error
   }
 
   trace_macros!(true);
   machine!(Machine(State) {
     event tr {
+      [ State::Error ]
       State::A    => State::B(0),
       State::B(i) => State::C(i+1)
     }
 
     event tr2 {
       State::C(_) => State::A,
-      State::A    => State::C(42)
+      State::A    => State::C(42) //,
+      //State::B
     }
   });
   trace_macros!(false);

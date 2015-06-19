@@ -3,6 +3,11 @@
 #[macro_export]
 macro_rules! machine (
   ( $machine:ident($state:ty) {
+    {
+      initial: $initial:path,
+      error:   $error:path
+    }
+
     $(
     event $ev:ident {
       $($tokens:tt)*
@@ -15,8 +20,13 @@ macro_rules! machine (
     }
 
     impl $machine {
+      fn new() -> $machine {
+        $machine { state: $initial }
+      }
+
       $(transitions!(
           $ev,
+          $error,
           $($tokens)*
         );
       )*
@@ -25,15 +35,7 @@ macro_rules! machine (
 );
 
 macro_rules! transitions (
-  ($ev:ident, $($state:pat => $res:expr),*) => (
-    fn $ev(&mut self) -> Option<()> {
-      match self.state {
-        $($state => {self.state = $res; Some(())},)*
-        _       => None
-      }
-    }
-  );
-  ($ev:ident, [ $err:expr]  $($state:pat => $res:expr),*) => (
+  ($ev:ident, $err:path,  $($state:pat => $res:expr),*) => (
     fn $ev(&mut self) -> Option<()> {
       match self.state {
         $($state => {self.state = $res; Some(())},)*
@@ -55,8 +57,12 @@ mod tests {
 
   trace_macros!(true);
   machine!(Machine(State) {
+    {
+      initial: State::A,
+      error  : State::Error
+    }
+
     event tr {
-      [ State::Error ]
       State::A    => State::B(0),
       State::B(i) => State::C(i+1)
     }
@@ -71,7 +77,7 @@ mod tests {
 
   #[test]
   fn a() {
-    let mut m = Machine { state: State::A };
+    let mut m = Machine::new();
     println!("state: {:?}", m);
     let mut res = m.tr();
     println!("state({:?}): {:?}", res, m);

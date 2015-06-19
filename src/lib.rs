@@ -9,7 +9,7 @@ macro_rules! machine (
     }
 
     $(
-    event $ev:ident {
+    event[$($def:tt)*] {
       $($tokens:tt)*
     }
     )*
@@ -25,8 +25,8 @@ macro_rules! machine (
       }
 
       $(transitions!(
-          $ev,
           $error,
+          $($def)*,
           $($tokens)*
         );
       )*
@@ -35,11 +35,19 @@ macro_rules! machine (
 );
 
 macro_rules! transitions (
-  ($ev:ident, $err:path,  $($state:pat => $res:expr),*) => (
+  ($err:path,  $ev:ident, $($state:pat => $res:expr),*) => (
     fn $ev(&mut self) -> Option<()> {
       match self.state {
         $($state => {self.state = $res; Some(())},)*
         _        => {self.state = $err; None}
+      }
+    }
+  );
+  ($err:path,  $ev:ident ($($args:ident : $t:ty),*) -> $out:ty : $default:expr, $($state:pat => $res:expr => $outres:expr),*) => (
+    fn $ev(&mut self, $($args:$t),*) -> $out {
+      match self.state {
+        $($state => {self.state = $res; $outres},)*
+        _        => {self.state = $err; $default}
       }
     }
   );
@@ -62,33 +70,38 @@ mod tests {
       error  : State::Error
     }
 
-    event tr {
+    event[tr]{
       State::A    => State::B(0),
       State::B(i) => State::C(i+1)
     }
 
-    event tr2 {
+    event[tr2] {
       State::C(_) => State::A,
-      State::A    => State::C(42) //,
-      //State::B
+      State::A    => State::C(42)
     }
+
+    event [tr3(arg1:u8) -> Option<u8> : None] {
+      State::A    => State::B(arg1) => Some(42) ,
+      State::B(i) => State::C(i+1)  => Some(i+1)
+    }
+
   });
   trace_macros!(false);
 
   #[test]
   fn a() {
     let mut m = Machine::new();
-    println!("state: {:?}", m);
+    println!("0: state: {:?}", m);
     let mut res = m.tr();
-    println!("state({:?}): {:?}", res, m);
+    println!("1: state({:?}): {:?}", res, m);
     res = m.tr();
-    println!("state({:?}): {:?}", res, m);
-    res = m.tr();
-    println!("state({:?}): {:?}", res, m);
+    println!("2: state({:?}): {:?}", res, m);
     res = m.tr2();
-    println!("state({:?}): {:?}", res, m);
+    println!("3: state({:?}): {:?}", res, m);
+    let mut res2 = m.tr3(12);
+    println!("4: state({:?}): {:?}", res2, m);
     res = m.tr2();
-    println!("state({:?}): {:?}", res, m);
+    println!("5: state({:?}): {:?}", res, m);
     assert!(false);
   }
 }

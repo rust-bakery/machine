@@ -30,6 +30,14 @@ macro_rules! machine (
           $($tokens)*
         );
       )*
+
+      fn reset(&mut self) {
+        self.state = $initial;
+      }
+
+      fn is_invalid(&self) -> bool {
+        self.state == $error
+      }
     }
   )
 );
@@ -131,6 +139,13 @@ mod tests {
     println!("5: state({:?}): {:?}", res3, m);
     res3 = m.tr4(1);
     println!("6: state({:?}): {:?}", res3, m);
+    res = m.tr2();
+    println!("7: state({:?}): {:?}", res, m);
+    if m.is_invalid() {
+      println!("had an invalid transition");
+    }
+    m.reset();
+    println!("8: state: {:?}", m);
     assert!(false);
   }
 }

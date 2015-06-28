@@ -14,14 +14,15 @@ macro_rules! machine (
     }
     )*
   }) => (
-    #[derive(PartialEq,Eq,Debug)]
+    #[derive(PartialEq,Eq,Clone,Debug)]
     struct $machine {
-      state: $state
+      state: $state,
+      trace: Vec<(&'static str, $state)>
     }
 
     impl $machine {
       fn new() -> $machine {
-        $machine { state: $initial }
+        $machine { state: $initial, trace: vec![ ("", $initial) ] }
       }
 
       $(transitions!(
@@ -33,10 +34,24 @@ macro_rules! machine (
 
       fn reset(&mut self) {
         self.state = $initial;
+        self.trace = vec![ ("", $initial) ];
       }
 
       fn is_invalid(&self) -> bool {
         self.state == $error
+      }
+
+      fn push_state(&mut self, event: &'static str, st: $state) {
+        self.trace.push((event, st))
+      }
+
+      fn print_trace(&self) -> String {
+        let mut res = String::new();
+        res.push_str(stringify!($initial));
+        for & (event, ref state) in (&self.trace[1..]).iter() {
+          res.push_str(& format!(" =( {} )=> {:?}", event, state));
+        }
+        res
       }
     }
   )
@@ -46,8 +61,16 @@ macro_rules! transitions (
   ($err:path,  $ev:ident, $($state:pat => $res:expr),*) => (
     fn $ev(&mut self) -> Option<()> {
       match self.state {
-        $($state => {self.state = $res; Some(())},)*
-        _        => {self.state = $err; None}
+        $($state => {
+          self.push_state(stringify!($ev), $res.clone());
+          self.state = $res;
+          Some(())
+        },)*
+        _        => {
+          self.state = $err;
+          self.push_state(stringify!($ev), $err);
+          None
+        }
       }
     }
   );
@@ -56,10 +79,15 @@ macro_rules! transitions (
       match self.state {
         $($state => {
           let (new_state, result) = $b;
+          self.push_state(stringify!($ev), new_state.clone());
           self.state = new_state;
           result
         }),*
-        _        => {self.state = $err; $default}
+        _        => {
+          self.state = $err;
+          self.push_state(stringify!($ev), $err);
+          $default
+        }
       }
     }
   );
@@ -70,7 +98,7 @@ mod tests {
   #![feature(trace_macros)]
   use super::*;
 
-  #[derive(PartialEq,Eq,Debug)]
+  #[derive(PartialEq,Eq,Debug,Clone)]
   pub enum State {
     A, B(u8), C(u8), Error
   }
@@ -144,6 +172,9 @@ mod tests {
     if m.is_invalid() {
       println!("had an invalid transition");
     }
+    m.tr();
+    m.tr2();
+    println!("trace: {}", m.print_trace());
     m.reset();
     println!("8: state: {:?}", m);
     assert!(false);

@@ -57,6 +57,7 @@ macro_rules! machine (
   )
 );
 
+#[macro_export]
 macro_rules! transitions (
   ($err:path,  $ev:ident, $($state:pat => $res:expr),*) => (
     fn $ev(&mut self) -> Option<()> {

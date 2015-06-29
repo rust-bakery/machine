@@ -40,6 +40,10 @@ macro_rules! dynamic_machine (
         self.state == $error
       }
 
+      fn current_state(&self) -> $state {
+        self.state.clone()
+      }
+
       fn push_state(&mut self, event: &'static str, st: $state) {
         self.trace.push((event, st))
       }

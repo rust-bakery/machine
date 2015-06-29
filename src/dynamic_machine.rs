@@ -18,6 +18,7 @@ macro_rules! dynamic_machine (
       trace: Vec<(&'static str, $state)>
     }
 
+    #[allow(dead_code)]
     impl $machine {
       fn new() -> $machine {
         $machine { state: $initial, trace: vec![ ("", $initial) ] }

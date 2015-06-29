@@ -1,9 +1,9 @@
 [package]
 
 name        = "machine"
-version     = "0.0.1"
+version     = "0.1.0"
 authors     = ["Geoffroy Couprie <contact@geoffroycouprie.com>"]
-description = "compiler checked state machine development"
+description = "State machine utilities"
 license     = "MIT"
 repository  = "https://github.com/Geal/machine"
 readme      = "./README.md"

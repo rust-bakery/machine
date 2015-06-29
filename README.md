@@ -12,7 +12,7 @@ machine is available on [crates.io](https://crates.io/crates/machine) and can be
 
 ```toml
 [dependencies]
-machine = "~0.0.1"
+machine = "~0.1.0"
 ```
 
 Then include it in your code like this:

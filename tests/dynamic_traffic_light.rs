@@ -3,7 +3,7 @@ extern crate machine;
 
 #[derive(PartialEq,Eq,Debug,Clone)]
 pub enum State {
-  Green,
+  Green(u8),
   Orange,
   Red,
   BlinkingOrange
@@ -11,7 +11,7 @@ pub enum State {
 
 dynamic_machine!(TrafficLight(State) {
   {
-    initial: State::Green,
+    initial: State::Green(0),
     error  : State::BlinkingOrange
   }
 
@@ -20,15 +20,23 @@ dynamic_machine!(TrafficLight(State) {
   }
 
   event[next] {
-    State::Green  => State::Orange,
-    State::Orange => State::Red,
-    State::Red    => State::Green
+    State::Green(_) => State::Orange,
+    State::Orange   => State::Red,
+    State::Red      => State::Green(0)
   }
 
   event[pass_car(nb: u8) -> Option<u8>: None] {
-    State::Green => {
-      let passed = if nb < 10 { nb } else { 10 };
-      (State::Green, Some(passed))
+    State::Green(current) => {
+      let passed = if nb + current <= 10 { nb } else { 10 - current };
+      if current + passed < 10 {
+        (State::Green(current + passed), Some(passed))
+      } else {
+        (State::Orange, Some(passed))
+      }
+    },
+    State::Orange => {
+      let passed = if nb > 1 { 1 } else { nb };
+      (State::Red, Some(passed))
     }
   }
 });
@@ -38,6 +46,7 @@ fn test() {
   let mut t = TrafficLight::new(10);
   t.pass_car(1);
   t.pass_car(2);
+  assert_eq!(t.current_state(), State::Green(3));
   t.next();
   println!("trace: {}", t.print_trace());
   assert_eq!(t.current_state(), State::Orange);
@@ -46,7 +55,13 @@ fn test() {
   assert_eq!(t.current_state(), State::Red);
 
   t.next();
-  t.pass_car(12);
-  assert_eq!(t.current_state(), State::Green);
+  assert_eq!(t.current_state(), State::Green(0));
+  t.pass_car(5);
+  assert_eq!(t.current_state(), State::Green(5));
+  t.pass_car(7);
+  assert_eq!(t.current_state(), State::Orange);
+  t.pass_car(2);
+  assert_eq!(t.current_state(), State::Red);
+  t.reset(10);
 }
 

@@ -2,8 +2,8 @@
 macro_rules! dynamic_machine (
   ( $machine:ident($state:ty) {
     {
-      initial: $initial:path,
-      error:   $error:path
+      initial: $initial:expr,
+      error:   $error:expr
     }
 
     attributes {
@@ -68,7 +68,7 @@ macro_rules! dynamic_machine (
 
 #[macro_export]
 macro_rules! transitions (
-  ($err:path,  $ev:ident, $($state:pat => $res:expr),*) => (
+  ($err:expr,  $ev:ident, $($state:pat => $res:expr),*) => (
     fn $ev(&mut self) -> Option<()> {
       match self.state {
         $($state => {
@@ -84,7 +84,7 @@ macro_rules! transitions (
       }
     }
   );
-  ($err:path,  $ev:ident ($($args:ident : $t:ty),*) -> $out:ty : $default:expr, $($state:pat => $b:block),*) => (
+  ($err:expr,  $ev:ident ($($args:ident : $t:ty),*) -> $out:ty : $default:expr, $($state:pat => $b:block),*) => (
     fn $ev(&mut self, $($args:$t),*) -> $out {
       match self.state {
         $($state => {

@@ -94,8 +94,6 @@ macro_rules! transitions (
 
 #[cfg(test)]
 mod tests {
-  #![feature(trace_macros)]
-  use super::*;
 
   #[derive(PartialEq,Eq,Debug,Clone)]
   pub enum State {
@@ -160,7 +158,7 @@ mod tests {
     println!("2: state({:?}): {:?}", res, m);
     res = m.tr2();
     println!("3: state({:?}): {:?}", res, m);
-    let mut res2 = m.tr3(12);
+    let res2 = m.tr3(12);
     println!("4: state({:?}): {:?}", res2, m);
     let mut res3 = m.tr4(1);
     println!("5: state({:?}): {:?}", res3, m);

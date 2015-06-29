@@ -123,10 +123,7 @@ macro_rules! static_trans_impl (
 
 #[cfg(test)]
 mod tests {
-  #![feature(trace_macros)]
-  use super::*;
-
-  trace_macros!(true);
+  //trace_macros!(true);
   static_machine!(Machine {
     attributes {
       counter: u8
@@ -171,16 +168,19 @@ mod tests {
 
     }
   });
-  trace_macros!(false);
+  //trace_macros!(false);
 
-    impl<T> Machine<T> {
-      pub fn inc(&mut self) {
-        self.counter = self.counter + 1
-      }
-      pub fn cnt(&self) -> u8 {
-        self.counter
-      }
+  /*
+  impl<T> Machine<T> {
+    pub fn inc(&mut self) {
+      self.counter = self.counter + 1
     }
+    pub fn cnt(&self) -> u8 {
+      self.counter
+    }
+  }
+  */
+
   #[test]
   fn transitions() {
     let m = Machine { state: SB { b: 1, c: true }, counter: 0 };

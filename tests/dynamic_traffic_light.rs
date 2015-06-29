@@ -1,50 +1,48 @@
 #[macro_use]
 extern crate machine;
 
-static_machine!(TrafficLight {
-  attributes {
-    cars: u8
+#[derive(PartialEq,Eq,Debug,Clone)]
+pub enum State {
+  Green,
+  Orange,
+  Red,
+  BlinkingOrange
+}
+
+dynamic_machine!(TrafficLight(State) {
+  {
+    initial: State::Green,
+    error  : State::BlinkingOrange
   }
 
-  impl {
-
+  event[next] {
+    State::Green  => State::Orange,
+    State::Orange => State::Red,
+    State::Red    => State::Green
   }
 
-  states {
-    Green { }  => {
-      next => Orange;
-    };
-
-    Orange { } => {
-      next => Red;
-    };
-
-    Red { }    =>  {
-      next => Green;
-    };
-
+  event[pass_car(nb: u8) -> Option<u8>: None] {
+    State::Green => {
+      let passed = if nb < 10 { nb } else { 10 };
+      (State::Green, Some(passed))
+    }
   }
 });
 
-impl TrafficLight<Green> {
-  pub fn pass_car(&mut self) {
-    self.cars = self.cars + 1;
-  }
-}
-
 #[test]
 fn test() {
-  let mut t = TrafficLight { state: Green, cars: 0 };
-  t.pass_car();
-  t.pass_car();
-  let t = t.next();
-  assert_eq!(t, TrafficLight { state: Orange, cars: 2 } );
+  let mut t = TrafficLight::new();
+  t.pass_car(1);
+  t.pass_car(2);
+  t.next();
+  println!("trace: {}", t.print_trace());
+  assert_eq!(t.current_state(), State::Orange);
 
-  let t = t.next();
-  assert_eq!(t, TrafficLight { state: Red, cars: 2 } );
+  t.next();
+  assert_eq!(t.current_state(), State::Red);
 
-  let mut t = t.next();
-  t.pass_car();
-  assert_eq!(t, TrafficLight { state: Green, cars: 3 } );
+  t.next();
+  t.pass_car(12);
+  assert_eq!(t.current_state(), State::Green);
 }
 

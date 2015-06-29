@@ -15,6 +15,10 @@ dynamic_machine!(TrafficLight(State) {
     error  : State::BlinkingOrange
   }
 
+  attributes {
+    max_passing:    u8
+  }
+
   event[next] {
     State::Green  => State::Orange,
     State::Orange => State::Red,
@@ -31,7 +35,7 @@ dynamic_machine!(TrafficLight(State) {
 
 #[test]
 fn test() {
-  let mut t = TrafficLight::new();
+  let mut t = TrafficLight::new(10);
   t.pass_car(1);
   t.pass_car(2);
   t.next();

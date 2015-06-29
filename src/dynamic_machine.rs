@@ -6,6 +6,10 @@ macro_rules! dynamic_machine (
       error:   $error:path
     }
 
+    attributes {
+      $($name:ident : $t:ty),*
+    }
+
     $(
     event[$($def:tt)*] {
       $($tokens:tt)*
@@ -15,13 +19,14 @@ macro_rules! dynamic_machine (
     #[derive(PartialEq,Eq,Clone,Debug)]
     struct $machine {
       state: $state,
-      trace: Vec<(&'static str, $state)>
+      trace: Vec<(&'static str, $state)>,
+      $($name : $t),*
     }
 
     #[allow(dead_code)]
     impl $machine {
-      fn new() -> $machine {
-        $machine { state: $initial, trace: vec![ ("", $initial) ] }
+      fn new($($name : $t),*) -> $machine {
+        $machine { state: $initial, trace: vec![ ("", $initial) ], $($name : $name),* }
       }
 
       $(transitions!(
@@ -31,9 +36,10 @@ macro_rules! dynamic_machine (
         );
       )*
 
-      fn reset(&mut self) {
+      fn reset(&mut self, $($name : $t),*) {
         self.state = $initial;
         self.trace = vec![ ("", $initial) ];
+        $(self.$name = $name;)*
       }
 
       fn is_invalid(&self) -> bool {
@@ -126,6 +132,8 @@ mod tests {
       initial: State::A,
       error  : State::Error
     }
+
+    attributes { }
 
     event[tr]{
       State::A    => State::B(0),

@@ -1,11 +1,5 @@
 language: rust
-
-addons:
-  apt:
-    packages:
-      - libcurl4-openssl-dev
-      - libelf-dev
-      - libdw-dev
+sudo: required
 
 rust:
   - nightly
@@ -23,7 +17,7 @@ script:
       travis-cargo --only stable doc
 
 after_success:
-  - travis-cargo coveralls --no-sudo
+  - travis-cargo coveralls
 
 notifications:
   webhooks:

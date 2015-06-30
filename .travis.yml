@@ -1,5 +1,29 @@
 language: rust
 
+rust:
+  - nightly
+  - beta
+
+before_script:
+  - pip install 'travis-cargo<0.2' --user && export PATH=$HOME/.local/bin:$PATH
+
+script:
+  - |
+      travis-cargo build &&
+      travis-cargo test &&
+      travis-cargo bench
+      travis-cargo doc
+
+after_success:
+  - travis-cargo coveralls
+
+addons:
+  apt:
+    packages:
+      - libcurl4-openssl-dev
+      - libelf-dev
+      - libdw-dev
+
 notifications:
   webhooks:
     urls:

@@ -23,7 +23,7 @@ script:
       travis-cargo --only stable doc
 
 after_success:
-  - travis-cargo coveralls
+  - travis-cargo coveralls --no-sudo
 
 notifications:
   webhooks:

@@ -1,7 +1,6 @@
 language: rust
 
 rust:
-  - nightly
   - beta
 
 before_script:

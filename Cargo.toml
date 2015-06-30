@@ -8,3 +8,6 @@ license     = "MIT"
 repository  = "https://github.com/Geal/machine"
 readme      = "./README.md"
 keywords    = ["state", "state-machine"]
+
+[features]
+unstable = []

@@ -11,3 +11,4 @@ keywords    = ["state", "state-machine"]
 
 [features]
 unstable = []
+nightly = []

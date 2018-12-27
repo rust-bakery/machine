@@ -1,3 +1,4 @@
+/*
 #[macro_use]
 extern crate machine;
 
@@ -47,4 +48,4 @@ fn test() {
   t.pass_car();
   assert_eq!(t, TrafficLight { state: Green, cars: 3 } );
 }
-
+*/

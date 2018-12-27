@@ -1,4 +1,4 @@
-#[macro_use]
+/*#[macro_use]
 extern crate machine;
 
 #[derive(PartialEq,Eq,Debug,Clone)]
@@ -64,4 +64,4 @@ fn test() {
   assert_eq!(t.current_state(), State::Red);
   t.reset(10);
 }
-
+*/

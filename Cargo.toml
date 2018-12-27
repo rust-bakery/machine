@@ -9,6 +9,10 @@ repository  = "https://github.com/Geal/machine"
 readme      = "./README.md"
 keywords    = ["state", "state-machine"]
 
-[features]
-unstable = []
-nightly = []
+[dependencies]
+syn = {version = "^0.15", features = ["full", "extra-traits"] }
+quote = "^0.6"
+log = "*"
+
+[lib]
+proc-macro = true

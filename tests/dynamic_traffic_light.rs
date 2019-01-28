@@ -1,67 +1,75 @@
-/*#[macro_use]
+#[macro_use]
 extern crate machine;
 
-#[derive(PartialEq,Eq,Debug,Clone)]
-pub enum State {
-  Green(u8),
-  Orange,
-  Red,
-  BlinkingOrange
-}
+machine!(
+  enum TrafficLight {
+    Green { count: u8 },
+    Orange,
+    Red,
+    BlinkingOrange,
+  }
+);
 
-dynamic_machine!(TrafficLight(State) {
-  {
-    initial: State::Green(0),
-    error  : State::BlinkingOrange
+#[derive(Clone,Debug,PartialEq)]
+pub struct Advance;
+
+#[derive(Clone,Debug,PartialEq)]
+pub struct PassCar { count: u8 }
+
+transitions!(TrafficLight,
+  [
+    (Green, Advance) => Orange,
+    (Orange, Advance) => Red,
+    (Red, Advance) => Green,
+    (Green, PassCar) => Green
+  ]
+);
+
+impl Green {
+  pub fn on_Advance(self, _: Advance) -> Orange {
+    Orange {}
   }
 
-  attributes {
-    max_passing:    u8
-  }
-
-  event[next] {
-    State::Green(_) => State::Orange,
-    State::Orange   => State::Red,
-    State::Red      => State::Green(0)
-  }
-
-  event[pass_car(nb: u8) -> Option<u8>: None] {
-    State::Green(current) => {
-      let passed = if nb + current <= 10 { nb } else { 10 - current };
-      if current + passed < 10 {
-        (State::Green(current + passed), Some(passed))
-      } else {
-        (State::Orange, Some(passed))
-      }
-    },
-    State::Orange => {
-      let passed = if nb > 1 { 1 } else { nb };
-      (State::Red, Some(passed))
+  pub fn on_PassCar(self, input: PassCar) -> Green {
+    Green {
+      count: self.count + input.count,
     }
   }
-});
+}
+
+impl Orange {
+  pub fn on_Advance(self, _: Advance) -> Red {
+    Red {}
+  }
+}
+
+impl Red {
+  pub fn on_Advance(self, _: Advance) -> Green {
+    Green {
+      count: 0
+    }
+  }
+}
 
 #[test]
 fn test() {
-  let mut t = TrafficLight::new(10);
-  t.pass_car(1);
-  t.pass_car(2);
-  assert_eq!(t.current_state(), State::Green(3));
-  t.next();
-  println!("trace: {}", t.print_trace());
-  assert_eq!(t.current_state(), State::Orange);
+  let mut t = TrafficLight::Green(Green { count: 0 });
+  t = t.on_PassCar(PassCar { count: 1}).unwrap();
+  t = t.on_PassCar(PassCar { count: 2}).unwrap();
+  assert_eq!(t, TrafficLight::green(3));
+  t = t.on_Advance(Advance).unwrap();
+  //println!("trace: {}", t.print_trace());
+  assert_eq!(t, TrafficLight::orange());
 
-  t.next();
-  assert_eq!(t.current_state(), State::Red);
+  t = t.on_Advance(Advance).unwrap();
+  assert_eq!(t, TrafficLight::red());
 
-  t.next();
-  assert_eq!(t.current_state(), State::Green(0));
-  t.pass_car(5);
-  assert_eq!(t.current_state(), State::Green(5));
-  t.pass_car(7);
-  assert_eq!(t.current_state(), State::Orange);
-  t.pass_car(2);
-  assert_eq!(t.current_state(), State::Red);
-  t.reset(10);
+  t = t.on_Advance(Advance).unwrap();
+  assert_eq!(t, TrafficLight::green(0));
+  t = t.on_PassCar(PassCar { count: 5 }).unwrap();
+  assert_eq!(t, TrafficLight::green(5));
+  t = t.on_PassCar(PassCar { count: 7 }).unwrap();
+  assert_eq!(t, TrafficLight::green(12));
+  t = t.on_Advance(Advance).unwrap();
+  assert_eq!(t, TrafficLight::orange());
 }
-*/

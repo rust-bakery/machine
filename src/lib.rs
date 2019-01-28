@@ -17,8 +17,8 @@ extern crate quote;
 extern crate log;
 
 use std::fmt::Debug;
-use std::fs::File;
-use std::io::Write;
+use std::fs::{File, OpenOptions};
+use std::io::{Write, Seek};
 use std::collections::{HashSet, HashMap};
 
 use syn::parse::{Parse, ParseStream, Result};
@@ -49,17 +49,20 @@ pub fn machine(input: proc_macro::TokenStream) -> syn::export::TokenStream {
     let ast = parse_macro_input!(input as syn::ItemEnum);
 
     // Build the impl
-    let gen = impl_machine(&ast);
+    let (name, gen) = impl_machine(&ast);
 
     //println!("generated: {:?}", gen);
     println!("generated: {}", gen);
-    let mut file = File::create("generated.rs").unwrap();
+
+    let file_name = format!("{}.rs", name.to_string().to_lowercase());
+    let mut file = File::create(&file_name).unwrap();
     file.write_all(gen.to_string().as_bytes());
+    file.flush();
 
     gen
 }
 
-fn impl_machine(ast: &syn::ItemEnum) -> syn::export::TokenStream {
+fn impl_machine(ast: &syn::ItemEnum) -> (&Ident, syn::export::TokenStream) {
     println!("ast: {:#?}", ast);
 
     let machine_name = &ast.ident;
@@ -214,7 +217,7 @@ fn impl_machine(ast: &syn::ItemEnum) -> syn::export::TokenStream {
 
     stream.extend(proc_macro::TokenStream::from(toks));
 
-    stream
+    (machine_name, stream)
 }
 
 fn validate(ast: &syn::DeriveInput) {
@@ -377,9 +380,12 @@ pub fn transitions(input: proc_macro::TokenStream) -> syn::export::TokenStream {
     stream.extend(proc_macro::TokenStream::from(toks));
 
     //println!("generated: {:?}", gen);
-    println!("generated: {}", stream);
-    let mut file = File::create("generated_transitions.rs").unwrap();
-    file.write_all(stream.to_string().as_bytes());
+    println!("generated transitions: {}", stream);
+    let file_name = format!("{}.rs", machine_name.to_string().to_lowercase());
+    let mut file = OpenOptions::new().write(true).open(&file_name).unwrap();
+    file.seek(std::io::SeekFrom::End(0)).expect("seek");
+    file.write_all(stream.to_string().as_bytes()).expect("write_all");
+    file.flush();
 
     stream
 

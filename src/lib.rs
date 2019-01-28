@@ -235,7 +235,7 @@ struct Transitions {
 struct Transition {
   pub start: Ident,
   pub message: Ident,
-  pub end: Ident,
+  pub end: Vec<Ident>,
 }
 
 impl Parse for Transitions {
@@ -280,7 +280,32 @@ impl Parse for Transition {
 
     let _: Token![=>] = input.parse()?;
 
-    let end: Ident = input.parse()?;
+    let end = match input.parse::<Ident>() {
+      Ok(i) => vec![i],
+      Err(_) => {
+        let content;
+        bracketed!(content in input);
+
+        //println!("content: {:?}", content);
+        let mut states = Vec::new();
+
+        let t: Ident = content.parse()?;
+        states.push(t);
+
+        loop {
+          let lookahead = content.lookahead1();
+          if lookahead.peek(Token![,]) {
+            let _: Token![,] = content.parse()?;
+            let t: Ident = content.parse()?;
+            states.push(t);
+          } else {
+            break;
+          }
+        }
+
+        states
+      }
+    };
 
     Ok(Transition { start, message, end })
   }
@@ -320,8 +345,15 @@ pub fn transitions(input: proc_macro::TokenStream) -> syn::export::TokenStream {
     let functions = messages.iter().map(|(msg, moves)| {
       let fn_ident = Ident::new(&format!("on_{}", &msg.to_string()), Span::call_site());
       let mv = moves.iter().map(|(start, end)| {
-        quote!{
-          #machine_name::#start(state) => Some(#machine_name::#end(state.#fn_ident(input))),
+        if end.len() == 1 {
+          let end_state = &end[0];
+          quote!{
+            #machine_name::#start(state) => Some(#machine_name::#end_state(state.#fn_ident(input))),
+          }
+        } else {
+          quote!{
+            #machine_name::#start(state) => Some(state.#fn_ident(input)),
+          }
         }
       }).collect::<Vec<_>>();
 

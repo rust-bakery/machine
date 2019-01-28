@@ -21,7 +21,7 @@ transitions!(TrafficLight,
     (Green, Advance) => Orange,
     (Orange, Advance) => Red,
     (Red, Advance) => Green,
-    (Green, PassCar) => Green
+    (Green, PassCar) => [Green, Orange]
   ]
 );
 
@@ -30,9 +30,13 @@ impl Green {
     Orange {}
   }
 
-  pub fn on_PassCar(self, input: PassCar) -> Green {
-    Green {
-      count: self.count + input.count,
+  pub fn on_PassCar(self, input: PassCar) -> TrafficLight {
+    let count = self.count + input.count;
+    if count >= 10 {
+      println!("reached max cars count: {}", count);
+      TrafficLight::orange()
+    } else {
+      TrafficLight::green(count)
     }
   }
 }
@@ -69,7 +73,7 @@ fn test() {
   t = t.on_PassCar(PassCar { count: 5 }).unwrap();
   assert_eq!(t, TrafficLight::green(5));
   t = t.on_PassCar(PassCar { count: 7 }).unwrap();
-  assert_eq!(t, TrafficLight::green(12));
-  t = t.on_Advance(Advance).unwrap();
   assert_eq!(t, TrafficLight::orange());
+  t = t.on_Advance(Advance).unwrap();
+  assert_eq!(t, TrafficLight::red());
 }

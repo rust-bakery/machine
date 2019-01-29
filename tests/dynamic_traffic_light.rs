@@ -16,12 +16,19 @@ pub struct Advance;
 #[derive(Clone,Debug,PartialEq)]
 pub struct PassCar { count: u8 }
 
+#[derive(Clone,Debug,PartialEq)]
+pub struct Toggle;
+
 transitions!(TrafficLight,
   [
     (Green, Advance) => Orange,
     (Orange, Advance) => Red,
     (Red, Advance) => Green,
-    (Green, PassCar) => [Green, Orange]
+    (Green, PassCar) => [Green, Orange],
+    (Green, Toggle) => BlinkingOrange,
+    (Orange, Toggle) => BlinkingOrange,
+    (Red, Toggle) => BlinkingOrange,
+    (BlinkingOrange, Toggle) => Red
   ]
 );
 
@@ -48,6 +55,10 @@ impl Green {
     }
   }
 
+  pub fn on_Toggle(self, _: Toggle) -> BlinkingOrange {
+    BlinkingOrange{}
+  }
+
   pub fn working(&self) -> bool {
     true
   }
@@ -56,6 +67,10 @@ impl Green {
 impl Orange {
   pub fn on_Advance(self, _: Advance) -> Red {
     Red {}
+  }
+
+  pub fn on_Toggle(self, _: Toggle) -> BlinkingOrange {
+    BlinkingOrange{}
   }
 
   pub fn working(&self) -> bool {
@@ -70,12 +85,20 @@ impl Red {
     }
   }
 
+  pub fn on_Toggle(self, _: Toggle) -> BlinkingOrange {
+    BlinkingOrange{}
+  }
+
   pub fn working(&self) -> bool {
     true
   }
 }
 
 impl BlinkingOrange {
+  pub fn on_Toggle(self, _: Toggle) -> Red {
+    Red{}
+  }
+
   pub fn working(&self) -> bool {
     false
   }

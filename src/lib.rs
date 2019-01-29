@@ -1,6 +1,5 @@
 extern crate proc_macro;
 /*
-#[macro_use] mod static_machine;
 #[macro_use] mod dynamic_machine;
 
 #[macro_export]
@@ -10,61 +9,45 @@ macro_rules! machine(
 */
 
 #[macro_use]
+extern crate log;
+#[macro_use]
 extern crate syn;
 #[macro_use]
 extern crate quote;
-#[macro_use]
-extern crate log;
 
-use std::fmt::Debug;
 use std::fs::{File, OpenOptions};
 use std::io::{Write, Seek};
-use std::collections::{HashSet, HashMap};
+use std::collections::HashMap;
 
 use syn::parse::{Parse, ParseStream, Result};
-//use proc_macro::{Ident, Span};
-use quote::ToTokens;
-use syn::{Abi, FnArg, FnDecl, Generics, ItemFn, Ident, MethodSig, ReturnType, Type, Visibility, WhereClause};
+use syn::{Abi, FnArg, FnDecl, Generics, Ident, MethodSig, ReturnType, Type, WhereClause};
 use syn::export::Span;
-
-//use proc_macro::TokenStream;
-
-#[derive(Debug,Clone)]
-struct MachineInput {
-}
-
-impl Parse for MachineInput {
-  fn parse(input: ParseStream) -> Result<Self> {
-    //println!("input: {:?}", input);
-    panic!();
-  }
-}
 
 #[proc_macro]
 pub fn machine(input: proc_macro::TokenStream) -> syn::export::TokenStream {
     // Construct a string representation of the type definition
-    let s = input.to_string();
-    println!("got string: {}", s);
+    //let s = input.to_string();
+    //println!("got string: {}", s);
 
     let ast = parse_macro_input!(input as syn::ItemEnum);
 
     // Build the impl
     let (name, gen) = impl_machine(&ast);
 
-    //println!("generated: {:?}", gen);
-    println!("generated: {}", gen);
+    trace!("generated: {}", gen);
 
     let file_name = format!("target/{}.rs", name.to_string().to_lowercase());
-    let mut file = OpenOptions::new().create(true).write(true).open(&file_name).unwrap();
-    file.seek(std::io::SeekFrom::End(0)).expect("seek");
-    file.write_all(gen.to_string().as_bytes());
-    file.flush();
+    OpenOptions::new().create(true).write(true).open(&file_name).and_then(|mut file| {
+      file.seek(std::io::SeekFrom::End(0))?;
+      file.write_all(gen.to_string().as_bytes())?;
+      file.flush()
+    }).expect("error writing machine definition");
 
     gen
 }
 
 fn impl_machine(ast: &syn::ItemEnum) -> (&Ident, syn::export::TokenStream) {
-    println!("ast: {:#?}", ast);
+    //println!("ast: {:#?}", ast);
 
     let machine_name = &ast.ident;
     let variants_names = &ast.variants.iter().map(|v| &v.ident).collect::<Vec<_>>();
@@ -147,14 +130,6 @@ fn impl_machine(ast: &syn::ItemEnum) -> (&Ident, syn::export::TokenStream) {
     (machine_name, stream)
 }
 
-fn validate(ast: &syn::DeriveInput) {
-  /*match ast.body {
-    syn::Body::Struct(_) => panic!("machine implementation can only be derived from a struct"),
-    _ => {},
-  }
-*/
-}
-
 #[derive(Debug)]
 struct Transitions {
   pub machine_name: Ident,
@@ -176,7 +151,7 @@ impl Parse for Transitions {
     let content;
     bracketed!(content in input);
 
-    //println!("content: {:?}", content);
+    trace!("content: {:?}", content);
     let mut transitions = Vec::new();
 
     let t: Transition = content.parse()?;
@@ -244,9 +219,10 @@ impl Parse for Transition {
 impl Transitions {
   pub fn render(&self) {
     let file_name = format!("target/{}.dot", self.machine_name.to_string().to_lowercase());
-    let mut file = File::create(&file_name).unwrap();
+    let mut file = File::create(&file_name).expect("error opening dot file");
 
-    file.write_all(format!("digraph {} {{\n", self.machine_name.to_string()).as_bytes());
+    file.write_all(format!("digraph {} {{\n", self.machine_name.to_string()).as_bytes())
+      .expect("error writing to dot file");
 
     let mut edges = Vec::new();
     for transition in self.transitions.iter() {
@@ -256,20 +232,22 @@ impl Transitions {
     }
 
     for edge in edges.iter() {
-      file.write_all(&format!("{} -> {} [ label = \"{}\" ];\n", edge.0, edge.2, edge.1).as_bytes());
+      file.write_all(&format!("{} -> {} [ label = \"{}\" ];\n", edge.0, edge.2, edge.1).as_bytes())
+        .expect("error writing to dot file");
     }
 
-    file.write_all(&b"}"[..]);
+    file.write_all(&b"}"[..]).expect("error writing to dot file");
+    file.flush().expect("error flushhing dot file");
   }
 }
 
 #[proc_macro]
 pub fn transitions(input: proc_macro::TokenStream) -> syn::export::TokenStream {
-    println!("\ninput: {:?}", input);
+    //println!("\ninput: {:?}", input);
     let mut stream = proc_macro::TokenStream::new();
 
     let transitions = parse_macro_input!(input as Transitions);
-    println!("\nparsed transitions: {:#?}", transitions);
+    trace!("\nparsed transitions: {:#?}", transitions);
 
     transitions.render();
 
@@ -331,23 +309,24 @@ pub fn transitions(input: proc_macro::TokenStream) -> syn::export::TokenStream {
     stream.extend(proc_macro::TokenStream::from(toks));
 
     //println!("generated: {:?}", gen);
-    println!("generated transitions: {}", stream);
+    trace!("generated transitions: {}", stream);
     let file_name = format!("target/{}.rs", machine_name.to_string().to_lowercase());
-    let mut file = OpenOptions::new().create(true).write(true).open(&file_name).unwrap();
-    file.seek(std::io::SeekFrom::End(0)).expect("seek");
-    file.write_all(stream.to_string().as_bytes()).expect("write_all");
-    file.flush();
+    OpenOptions::new().create(true).write(true).open(&file_name).and_then(|mut file| {
+      file.seek(std::io::SeekFrom::End(0))?;
+      file.write_all(stream.to_string().as_bytes())?;
+      file.flush()
+    }).expect("error writing transitions");
 
     stream
 }
 
 #[proc_macro]
 pub fn methods(input: proc_macro::TokenStream) -> syn::export::TokenStream {
-    println!("\ninput: {:?}", input);
+    //println!("\ninput: {:?}", input);
     let mut stream = proc_macro::TokenStream::new();
 
     let methods = parse_macro_input!(input as Methods);
-    println!("\nparsed methods: {:#?}", methods);
+    trace!("\nparsed methods: {:#?}", methods);
 
     let mut h = HashMap::new();
     for method in methods.methods.iter() {
@@ -375,7 +354,7 @@ pub fn methods(input: proc_macro::TokenStream) -> syn::export::TokenStream {
               }
             }
           }
-          MethodType::Fn(m) => {
+          MethodType::Fn(_) => {
             // we let the user implement these methods on the types
             quote!{}
           }
@@ -477,10 +456,11 @@ pub fn methods(input: proc_macro::TokenStream) -> syn::export::TokenStream {
     stream.extend(proc_macro::TokenStream::from(toks));
 
     let file_name = format!("target/{}.rs", machine_name.to_string().to_lowercase());
-    let mut file = OpenOptions::new().create(true).write(true).open(&file_name).unwrap();
-    file.seek(std::io::SeekFrom::End(0)).expect("seek");
-    file.write_all(stream.to_string().as_bytes()).expect("write_all");
-    file.flush();
+    OpenOptions::new().create(true).write(true).open(&file_name).and_then(|mut file| {
+      file.seek(std::io::SeekFrom::End(0))?;
+      file.write_all(stream.to_string().as_bytes())?;
+      file.flush()
+    }).expect("error writing methods");
 
     stream
 }
@@ -554,7 +534,7 @@ impl Parse for Method {
     let _: Token![=>] = input.parse()?;
     let method_type = match parse_method_sig(input) {
       Ok(f) => MethodType::Fn(f),
-      Err(e) => {
+      Err(_) => {
         let i: Ident = input.parse()?;
         let name: Ident = input.parse()?;
         let _: Token![:] = input.parse()?;
@@ -575,7 +555,7 @@ impl Parse for Method {
 }
 
 fn parse_method_sig(input: ParseStream) -> Result<MethodSig> {
-  let vis: Visibility = input.parse()?;
+  //let vis: Visibility = input.parse()?;
   let constness: Option<Token![const]> = input.parse()?;
   let unsafety: Option<Token![unsafe]> = input.parse()?;
   let asyncness: Option<Token![async]> = input.parse()?;

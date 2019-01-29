@@ -26,7 +26,7 @@ transitions!(State,
 );
 
 impl Start {
-  pub fn on_Msg1(self, input: Msg1) -> End {
+  pub fn on_Msg1(self, _input: Msg1) -> End {
     End {
       x: self.x,
       y: true,
@@ -35,7 +35,7 @@ impl Start {
 }
 
 impl End {
-  pub fn on_Msg1(self, input: Msg1) -> End {
+  pub fn on_Msg1(self, _input: Msg1) -> End {
     End {
       x: self.x,
       y: !self.y,
@@ -46,8 +46,8 @@ impl End {
 #[test]
 fn hello() {
   let start = State::start(0);
-  let end  = State::end(1, true);
-  let err = State::error();
+  let _end  = State::end(1, true);
+  let _err = State::error();
 
   assert_eq!(start, State::Start(Start { x: 0 }));
 }

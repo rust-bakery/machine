@@ -12,7 +12,7 @@ keywords    = ["state", "state-machine"]
 [dependencies]
 syn = {version = "^0.15", features = ["full", "extra-traits"] }
 quote = "^0.6"
-log = "*"
+log = "^0.4"
 
 [lib]
 proc-macro = true

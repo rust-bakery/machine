@@ -9,6 +9,13 @@ repository  = "https://github.com/Geal/machine"
 readme      = "./README.md"
 keywords    = ["state", "state-machine"]
 
+include = [
+  "LICENSE-APACHE",
+  "LICENSE-MIT",
+  "Cargo.toml",
+  "src/lib.rs",
+  "tests/*.rs"
+]
 [dependencies]
 syn = {version = "^0.15", features = ["full", "extra-traits"] }
 quote = "^0.6"

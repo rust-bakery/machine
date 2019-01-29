@@ -9,7 +9,6 @@ machine!(
   enum State {
     Start { pub x:u8 },
     End { pub x: u8, y: bool },
-    Error,
   }
 );
 
@@ -22,8 +21,7 @@ pub struct Msg2;
 transitions!(State,
   [
   (Start, Msg1) => End,
-  (End, Msg1) => End,
-  (Start, Msg2) => Error
+  (End, Msg1) => End
   ]
 );
 
@@ -33,10 +31,6 @@ impl Start {
       x: self.x,
       y: true,
     }
-  }
-
-  pub fn on_Msg2(self, input: Msg2) -> Error {
-    Error {}
   }
 }
 

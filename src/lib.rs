@@ -73,6 +73,7 @@ fn impl_machine(ast: &syn::ItemEnum) -> (&Ident, syn::export::TokenStream) {
     let toks = quote! {
       #[derive(Clone,Debug,PartialEq)]
       pub enum #machine_name {
+        Error,
         #(#variants_names(#structs_names)),*
       }
     };
@@ -133,6 +134,10 @@ fn impl_machine(ast: &syn::ItemEnum) -> (&Ident, syn::export::TokenStream) {
     let toks = quote!{
       impl #machine_name {
         #(#methods)*
+
+        pub fn error() -> #machine_name {
+          #machine_name::Error
+        }
       }
     };
 
@@ -272,20 +277,20 @@ pub fn transitions(input: proc_macro::TokenStream) -> syn::export::TokenStream {
         if end.len() == 1 {
           let end_state = &end[0];
           quote!{
-            #machine_name::#start(state) => Some(#machine_name::#end_state(state.#fn_ident(input))),
+            #machine_name::#start(state) => #machine_name::#end_state(state.#fn_ident(input)),
           }
         } else {
           quote!{
-            #machine_name::#start(state) => Some(state.#fn_ident(input)),
+            #machine_name::#start(state) => state.#fn_ident(input),
           }
         }
       }).collect::<Vec<_>>();
 
       quote! {
-        pub fn #fn_ident(self, input: #msg) -> Option<#machine_name> {
+        pub fn #fn_ident(self, input: #msg) -> #machine_name {
           match self {
           #(#mv)*
-            _ => None,
+            _ => #machine_name::Error,
           }
         }
       }

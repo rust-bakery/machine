@@ -84,22 +84,26 @@ impl BlinkingOrange {
 #[test]
 fn test() {
   let mut t = TrafficLight::Green(Green { count: 0 });
-  t = t.on_PassCar(PassCar { count: 1}).unwrap();
-  t = t.on_PassCar(PassCar { count: 2}).unwrap();
+  t = t.on_PassCar(PassCar { count: 1});
+  t = t.on_PassCar(PassCar { count: 2});
   assert_eq!(t, TrafficLight::green(3));
-  t = t.on_Advance(Advance).unwrap();
+  t = t.on_Advance(Advance);
   //println!("trace: {}", t.print_trace());
   assert_eq!(t, TrafficLight::orange());
 
-  t = t.on_Advance(Advance).unwrap();
+  t = t.on_Advance(Advance);
   assert_eq!(t, TrafficLight::red());
 
-  t = t.on_Advance(Advance).unwrap();
+  t = t.on_Advance(Advance);
   assert_eq!(t, TrafficLight::green(0));
-  t = t.on_PassCar(PassCar { count: 5 }).unwrap();
+  t = t.on_PassCar(PassCar { count: 5 });
   assert_eq!(t, TrafficLight::green(5));
-  t = t.on_PassCar(PassCar { count: 7 }).unwrap();
+  t = t.on_PassCar(PassCar { count: 7 });
   assert_eq!(t, TrafficLight::orange());
-  t = t.on_Advance(Advance).unwrap();
+  t = t.on_Advance(Advance);
   assert_eq!(t, TrafficLight::red());
+  t = t.on_PassCar(PassCar { count: 7 });
+  assert_eq!(t, TrafficLight::error());
+  t = t.on_Advance(Advance);
+  assert_eq!(t, TrafficLight::error());
 }

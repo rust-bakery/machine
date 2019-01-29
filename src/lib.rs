@@ -240,6 +240,28 @@ impl Parse for Transition {
   }
 }
 
+impl Transitions {
+  pub fn render(&self) {
+    let file_name = format!("{}.dot", self.machine_name.to_string().to_lowercase());
+    let mut file = File::create(&file_name).unwrap();
+
+    file.write_all(format!("digraph {} {{\n", self.machine_name.to_string()).as_bytes());
+
+    let mut edges = Vec::new();
+    for transition in self.transitions.iter() {
+      for state in transition.end.iter() {
+        edges.push((&transition.start, &transition.message, state));
+      }
+    }
+
+    for edge in edges.iter() {
+      file.write_all(&format!("{} -> {} [ label = \"{}\" ];\n", edge.0, edge.2, edge.1).as_bytes());
+    }
+
+    file.write_all(&b"}"[..]);
+  }
+}
+
 #[proc_macro]
 pub fn transitions(input: proc_macro::TokenStream) -> syn::export::TokenStream {
     println!("\ninput: {:?}", input);
@@ -247,6 +269,8 @@ pub fn transitions(input: proc_macro::TokenStream) -> syn::export::TokenStream {
 
     let transitions = parse_macro_input!(input as Transitions);
     println!("\nparsed transitions: {:#?}", transitions);
+
+    transitions.render();
 
     let machine_name = transitions.machine_name;
 

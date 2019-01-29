@@ -54,8 +54,9 @@ pub fn machine(input: proc_macro::TokenStream) -> syn::export::TokenStream {
     //println!("generated: {:?}", gen);
     println!("generated: {}", gen);
 
-    let file_name = format!("{}.rs", name.to_string().to_lowercase());
-    let mut file = File::create(&file_name).unwrap();
+    let file_name = format!("target/{}.rs", name.to_string().to_lowercase());
+    let mut file = OpenOptions::new().create(true).write(true).open(&file_name).unwrap();
+    file.seek(std::io::SeekFrom::End(0)).expect("seek");
     file.write_all(gen.to_string().as_bytes());
     file.flush();
 
@@ -242,7 +243,7 @@ impl Parse for Transition {
 
 impl Transitions {
   pub fn render(&self) {
-    let file_name = format!("{}.dot", self.machine_name.to_string().to_lowercase());
+    let file_name = format!("target/{}.dot", self.machine_name.to_string().to_lowercase());
     let mut file = File::create(&file_name).unwrap();
 
     file.write_all(format!("digraph {} {{\n", self.machine_name.to_string()).as_bytes());
@@ -331,8 +332,8 @@ pub fn transitions(input: proc_macro::TokenStream) -> syn::export::TokenStream {
 
     //println!("generated: {:?}", gen);
     println!("generated transitions: {}", stream);
-    let file_name = format!("{}.rs", machine_name.to_string().to_lowercase());
-    let mut file = OpenOptions::new().write(true).open(&file_name).unwrap();
+    let file_name = format!("target/{}.rs", machine_name.to_string().to_lowercase());
+    let mut file = OpenOptions::new().create(true).write(true).open(&file_name).unwrap();
     file.seek(std::io::SeekFrom::End(0)).expect("seek");
     file.write_all(stream.to_string().as_bytes()).expect("write_all");
     file.flush();
@@ -475,8 +476,8 @@ pub fn methods(input: proc_macro::TokenStream) -> syn::export::TokenStream {
 
     stream.extend(proc_macro::TokenStream::from(toks));
 
-    let file_name = format!("{}.rs", machine_name.to_string().to_lowercase());
-    let mut file = OpenOptions::new().write(true).open(&file_name).unwrap();
+    let file_name = format!("target/{}.rs", machine_name.to_string().to_lowercase());
+    let mut file = OpenOptions::new().create(true).write(true).open(&file_name).unwrap();
     file.seek(std::io::SeekFrom::End(0)).expect("seek");
     file.write_all(stream.to_string().as_bytes()).expect("write_all");
     file.flush();

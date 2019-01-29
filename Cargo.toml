@@ -13,6 +13,7 @@ keywords    = ["state", "state-machine"]
 syn = {version = "^0.15", features = ["full", "extra-traits"] }
 quote = "^0.6"
 log = "^0.4"
+case = "^1.0"
 
 [lib]
 proc-macro = true

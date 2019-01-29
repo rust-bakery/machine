@@ -1,4 +1,5 @@
 extern crate proc_macro;
+extern crate case;
 /*
 #[macro_use] mod dynamic_machine;
 
@@ -22,6 +23,7 @@ use std::collections::HashMap;
 use syn::parse::{Parse, ParseStream, Result};
 use syn::{Abi, FnArg, FnDecl, Generics, Ident, MethodSig, ReturnType, Type, WhereClause};
 use syn::export::Span;
+use case::CaseExt;
 
 #[proc_macro]
 pub fn machine(input: proc_macro::TokenStream) -> syn::export::TokenStream {
@@ -275,7 +277,7 @@ pub fn transitions(input: proc_macro::TokenStream) -> syn::export::TokenStream {
     stream.extend(proc_macro::TokenStream::from(toks));
 
     let functions = messages.iter().map(|(msg, moves)| {
-      let fn_ident = Ident::new(&format!("on_{}", &msg.to_string()), Span::call_site());
+      let fn_ident = Ident::new(&format!("on_{}", &msg.to_string().to_snake()), Span::call_site());
       let mv = moves.iter().map(|(start, end)| {
         if end.len() == 1 {
           let end_state = &end[0];

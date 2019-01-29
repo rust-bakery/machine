@@ -26,7 +26,7 @@ transitions!(State,
 );
 
 impl Start {
-  pub fn on_Msg1(self, _input: Msg1) -> End {
+  pub fn on_msg1(self, _input: Msg1) -> End {
     End {
       x: self.x,
       y: true,
@@ -35,7 +35,7 @@ impl Start {
 }
 
 impl End {
-  pub fn on_Msg1(self, _input: Msg1) -> End {
+  pub fn on_msg1(self, _input: Msg1) -> End {
     End {
       x: self.x,
       y: !self.y,

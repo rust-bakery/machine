@@ -1,8 +1,8 @@
 # Machine
 
 [![Join the chat at https://gitter.im/Geal/nom](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/Geal/nom?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
-[![Build Status](https://travis-ci.org/Geal/machine.svg?branch=master)](https://travis-ci.org/Geal/machine)
-[![Coverage Status](https://coveralls.io/repos/Geal/machine/badge.svg?branch=master)](https://coveralls.io/r/Geal/machine?branch=master)
+[![Build Status](https://travis-ci.org/rust-bakery/machine.svg?branch=master)](https://travis-ci.org/rust-bakery/machine)
+[![Coverage Status](https://coveralls.io/repos/rust-bakery/machine/badge.svg?branch=master)](https://coveralls.io/r/rust-bakery/machine?branch=master)
 
 ## Features
 
@@ -269,7 +269,7 @@ Green -> Orange [ label = "PassCar" ];
 
 `dot -Tpng target/traffic.dot > traffic.png` will generate the following image:
 
-![traffic light transitions graph](https://raw.githubusercontent.com/Geal/machine/master/assets/traffic.png)
+![traffic light transitions graph](https://raw.githubusercontent.com/rust-bakery/machine/master/assets/traffic.png)
 
 We can then use the messages to trigger transitions:
 

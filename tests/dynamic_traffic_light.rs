@@ -25,6 +25,14 @@ transitions!(TrafficLight,
   ]
 );
 
+methods!(TrafficLight,
+  [
+    Green => get count: u8,
+    Green => set count: u8,
+    Green, Orange, Red, BlinkingOrange => fn working(&self) -> bool
+  ]
+);
+
 impl Green {
   pub fn on_Advance(self, _: Advance) -> Orange {
     Orange {}
@@ -39,11 +47,19 @@ impl Green {
       TrafficLight::green(count)
     }
   }
+
+  pub fn working(&self) -> bool {
+    true
+  }
 }
 
 impl Orange {
   pub fn on_Advance(self, _: Advance) -> Red {
     Red {}
+  }
+
+  pub fn working(&self) -> bool {
+    true
   }
 }
 
@@ -52,6 +68,16 @@ impl Red {
     Green {
       count: 0
     }
+  }
+
+  pub fn working(&self) -> bool {
+    true
+  }
+}
+
+impl BlinkingOrange {
+  pub fn working(&self) -> bool {
+    false
   }
 }
 

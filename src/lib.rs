@@ -415,15 +415,28 @@ use std::io::{Seek, Write};
 use case::CaseExt;
 use syn::export::Span;
 use syn::parse::{Parse, ParseStream, Result};
-use syn::{Abi, FnArg, FnDecl, Generics, Ident, MethodSig, ReturnType, Type, WhereClause};
+use syn::{
+    Abi, Attribute, FnArg, FnDecl, Generics, Ident, ItemEnum, MethodSig, ReturnType, Type,
+    WhereClause,
+};
+
+struct Machine {
+    attributes: Vec<Attribute>,
+    data: ItemEnum,
+}
+
+impl Parse for Machine {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let attributes: Vec<Attribute> = input.call(Attribute::parse_outer)?;
+        let data: syn::ItemEnum = input.parse()?;
+
+        Ok(Machine { attributes, data })
+    }
+}
 
 #[proc_macro]
 pub fn machine(input: proc_macro::TokenStream) -> syn::export::TokenStream {
-    // Construct a string representation of the type definition
-    //let s = input.to_string();
-    //println!("got string: {}", s);
-
-    let ast = parse_macro_input!(input as syn::ItemEnum);
+    let ast = parse_macro_input!(input as Machine);
 
     // Build the impl
     let (name, gen) = impl_machine(&ast);
@@ -445,7 +458,10 @@ pub fn machine(input: proc_macro::TokenStream) -> syn::export::TokenStream {
     gen
 }
 
-fn impl_machine(ast: &syn::ItemEnum) -> (&Ident, syn::export::TokenStream) {
+fn impl_machine(m: &Machine) -> (&Ident, syn::export::TokenStream) {
+    let Machine { attributes, data } = m;
+    let ast = data;
+    //println!("attributes: {:?}", attributes);
     //println!("ast: {:#?}", ast);
 
     let machine_name = &ast.ident;
@@ -454,7 +470,7 @@ fn impl_machine(ast: &syn::ItemEnum) -> (&Ident, syn::export::TokenStream) {
 
     // define the state enum
     let toks = quote! {
-      #[derive(Clone,Debug,PartialEq)]
+      #(#attributes)*
       pub enum #machine_name {
         Error,
         #(#variants_names(#structs_names)),*
@@ -482,7 +498,7 @@ fn impl_machine(ast: &syn::ItemEnum) -> (&Ident, syn::export::TokenStream) {
             .collect::<Vec<_>>();
 
         let toks = quote! {
-          #[derive(Clone,Debug,PartialEq)]
+          #(#attributes)*
           pub struct #name {
             #(#fields),*
           }

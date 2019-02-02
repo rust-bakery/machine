@@ -2,6 +2,7 @@
 extern crate machine;
 
 machine!(
+  #[derive(Clone,Debug,PartialEq)]
   enum TrafficLight {
     Green { count: u8 },
     Orange,

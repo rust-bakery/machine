@@ -6,6 +6,7 @@ pub trait Transitions {
 }
 
 machine!(
+  #[derive(Clone,Debug,PartialEq)]
   enum State {
     Start { pub x:u8 },
     End { pub x: u8, y: bool },

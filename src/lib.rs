@@ -444,10 +444,7 @@ pub fn machine(input: proc_macro::TokenStream) -> syn::export::TokenStream {
     trace!("generated: {}", gen);
 
     let file_name = format!("target/{}.rs", name.to_string().to_lowercase());
-    OpenOptions::new()
-        .create(true)
-        .write(true)
-        .open(&file_name)
+    File::create(&file_name)
         .and_then(|mut file| {
             file.seek(std::io::SeekFrom::End(0))?;
             file.write_all(gen.to_string().as_bytes())?;

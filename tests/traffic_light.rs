@@ -37,7 +37,7 @@ methods!(TrafficLight,
   [
     Green => get count: u8,
     Green => set count: u8,
-    Green, Orange, Red, BlinkingOrange => fn working(&self) -> bool
+    Green, Orange, Red, BlinkingOrange => default fn working(&self) -> bool
   ]
 );
 

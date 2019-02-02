@@ -508,8 +508,8 @@ fn impl_machine(m: &Machine) -> (&Ident, syn::export::TokenStream) {
         .variants
         .iter()
         .map(|variant| {
-            let fn_name = Ident::new(&variant.ident.to_string().to_lowercase(), Span::call_site());
-            let struct_name = &variant.ident; //Ident::new(variant.ident.to_string().to_lowercase(), Span::call_site());
+            let fn_name = Ident::new(&variant.ident.to_string().to_snake(), Span::call_site());
+            let struct_name = &variant.ident;
 
             let args = &variant
                 .fields

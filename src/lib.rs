@@ -416,7 +416,7 @@ use case::CaseExt;
 use syn::export::Span;
 use syn::parse::{Parse, ParseStream, Result};
 use syn::{
-    Abi, Attribute, FnArg, FnDecl, Generics, Ident, ItemEnum, MethodSig, ReturnType, Type,
+    Abi, Attribute, Expr, FnArg, FnDecl, Generics, Ident, ItemEnum, MethodSig, ReturnType, Type,
     WhereClause,
 };
 
@@ -889,15 +889,14 @@ pub fn methods(input: proc_macro::TokenStream) -> syn::export::TokenStream {
                     .iter()
                     .map(|state| {
                         let a = args.clone();
-                        if method.default {
-                          quote! {
-                            #machine_name::#state(ref v) => v.#ident( #(#a),* ),
-                          }
-
+                        if method.default.is_default() {
+                            quote! {
+                              #machine_name::#state(ref v) => v.#ident( #(#a),* ),
+                            }
                         } else {
-                          quote! {
-                            #machine_name::#state(ref v) => Some(v.#ident( #(#a),* )),
-                          }
+                            quote! {
+                              #machine_name::#state(ref v) => Some(v.#ident( #(#a),* )),
+                            }
                         }
                     })
                     .collect::<Vec<_>>();
@@ -906,37 +905,49 @@ pub fn methods(input: proc_macro::TokenStream) -> syn::export::TokenStream {
                 let output = match &m.decl.output {
                     ReturnType::Default => quote! {},
                     ReturnType::Type(arrow, ty) => {
-                      if method.default {
-                        quote! {
-                          #arrow #ty
+                        if method.default.is_default() {
+                            quote! {
+                              #arrow #ty
+                            }
+                        } else {
+                            quote! {
+                              #arrow Option<#ty>
+                            }
                         }
-                      } else {
-                        quote! {
-                          #arrow Option<#ty>
-                        }
-                      }
-                    },
+                    }
                 };
 
-                if method.default {
-                  quote! {
-                    pub fn #ident(#inputs) #output {
-                      match self {
-                        #(#variants)*
-                        _ => std::default::Default::default(),
-                      }
+                match method.default {
+                    DefaultValue::None => {
+                        quote! {
+                          pub fn #ident(#inputs) #output {
+                            match self {
+                              #(#variants)*
+                              _ => None,
+                            }
+                          }
+                        }
                     }
-                  }
-
-                } else {
-                  quote! {
-                    pub fn #ident(#inputs) #output {
-                      match self {
-                        #(#variants)*
-                        _ => None,
-                      }
+                    DefaultValue::Default => {
+                        quote! {
+                          pub fn #ident(#inputs) #output {
+                            match self {
+                              #(#variants)*
+                              _ => std::default::Default::default(),
+                            }
+                          }
+                        }
                     }
-                  }
+                    DefaultValue::Val(ref expr) => {
+                        quote! {
+                          pub fn #ident(#inputs) #output {
+                            match self {
+                              #(#variants)*
+                              _ => #expr,
+                            }
+                          }
+                        }
+                    }
                 }
             }
         })
@@ -975,13 +986,30 @@ struct Methods {
 struct Method {
     pub states: Vec<Ident>,
     pub method_type: MethodType,
-    pub default: bool,
+    pub default: DefaultValue,
 }
+
 #[derive(Debug)]
 enum MethodType {
     Get(Ident, Type),
     Set(Ident, Type),
     Fn(MethodSig),
+}
+
+#[derive(Debug)]
+enum DefaultValue {
+    None,
+    Default,
+    Val(Expr),
+}
+
+impl DefaultValue {
+    pub fn is_default(&self) -> bool {
+        match self {
+            DefaultValue::None => false,
+            _ => true,
+        }
+    }
 }
 
 impl Parse for Methods {
@@ -1014,6 +1042,18 @@ impl Parse for Methods {
         })
     }
 }
+struct ParenVal {
+    expr: Expr,
+}
+
+impl Parse for ParenVal {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let stream;
+        parenthesized!(stream in input);
+        let expr: Expr = stream.parse()?;
+        Ok(ParenVal { expr })
+    }
+}
 
 impl Parse for Method {
     fn parse(input: ParseStream) -> Result<Self> {
@@ -1034,7 +1074,15 @@ impl Parse for Method {
         }
 
         let _: Token![=>] = input.parse()?;
-        let default: Option<Token![default]> = input.parse()?;
+        let default_token: Option<Token![default]> = input.parse()?;
+        let default = if default_token.is_some() {
+            match input.parse::<ParenVal>() {
+                Ok(content) => DefaultValue::Val(content.expr),
+                Err(_) => DefaultValue::Default,
+            }
+        } else {
+            DefaultValue::None
+        };
 
         let method_type = match parse_method_sig(input) {
             Ok(f) => MethodType::Fn(f),
@@ -1057,7 +1105,7 @@ impl Parse for Method {
         Ok(Method {
             states,
             method_type,
-            default: default.is_some(),
+            default,
         })
     }
 }

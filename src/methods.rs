@@ -1,6 +1,4 @@
 use std::collections::HashMap;
-use std::fs::OpenOptions;
-use std::io::{Seek, Write};
 
 use syn::export::Span;
 use syn::parse::{Parse, ParseStream, Result};
@@ -180,6 +178,16 @@ fn parse_method_sig(input: ParseStream) -> Result<MethodSig> {
 
 impl Methods {
     pub fn generate(&self) -> (&Ident, syn::export::TokenStream) {
+        let machine_name = &self.machine_name;
+        let mut stream = proc_macro::TokenStream::new();
+
+        stream.extend(self.generate_state_impls());
+        stream.extend(self.generate_impl());
+
+        (machine_name, stream)
+    }
+
+    pub fn generate_state_impls(&self) -> syn::export::TokenStream {
         let mut stream = proc_macro::TokenStream::new();
 
         let mut h = HashMap::new();
@@ -191,199 +199,227 @@ impl Methods {
         }
 
         for (state, methods) in h.iter() {
-            let method_toks = methods
-                .iter()
-                .map(|method| {
-                    match method {
-                        MethodType::Get(ident, ty) => {
-                            quote! {
-                              pub fn #ident(&self) -> &#ty {
-                                &self.#ident
-                              }
-                            }
-                        }
-                        MethodType::Set(ident, ty) => {
-                            let mut_ident = Ident::new(
-                                &format!("{}_mut", &ident.to_string()),
-                                Span::call_site(),
-                            );
-                            quote! {
-                              pub fn #mut_ident(&mut self) -> &mut #ty {
-                                &mut self.#ident
-                              }
-                            }
-                        }
-                        MethodType::Fn(_) => {
-                            // we let the user implement these methods on the types
-                            quote! {}
-                        }
-                    }
-                })
-                .collect::<Vec<_>>();
-
-            let toks = quote! {
-              impl #state {
-                #(#method_toks)*
-              }
-            };
-
-            stream.extend(proc_macro::TokenStream::from(toks));
+            stream.extend(self.generate_state_impl(*state, methods));
         }
 
-        let machine_name = &self.machine_name;
-        let wrapper_methods = self
-            .methods
+        stream
+    }
+
+    pub fn generate_state_impl(
+        &self,
+        state: &syn::Ident,
+        methods: &[&MethodType],
+    ) -> syn::export::TokenStream {
+        let method_tokens = methods
             .iter()
-            .map(|method| match &method.method_type {
-                MethodType::Get(ident, ty) => {
-                    let variants = method
-                        .states
-                        .iter()
-                        .map(|state| {
-                            quote! {
-                              #machine_name::#state(ref v) => Some(v.#ident()),
-                            }
-                        })
-                        .collect::<Vec<_>>();
-                    quote! {
-                      pub fn #ident(&self) -> Option<&#ty> {
-                        match self {
-                          #(#variants)*
-                          _ => None,
+            .map(|method| {
+                match method {
+                    MethodType::Get(ident, ty) => {
+                        quote! {
+                          pub fn #ident(&self) -> &#ty {
+                            &self.#ident
+                          }
                         }
-                      }
                     }
-                }
-                MethodType::Set(ident, ty) => {
-                    let mut_ident =
-                        Ident::new(&format!("{}_mut", &ident.to_string()), Span::call_site());
-
-                    let variants = method
-                        .states
-                        .iter()
-                        .map(|state| {
-                            quote! {
-                              #machine_name::#state(ref mut v) => Some(v.#mut_ident()),
-                            }
-                        })
-                        .collect::<Vec<_>>();
-                    quote! {
-                      pub fn #mut_ident(&mut self) -> Option<&mut #ty> {
-                        match self {
-                          #(#variants)*
-                          _ => None,
+                    MethodType::Set(ident, ty) => {
+                        let mut_ident =
+                            Ident::new(&format!("{}_mut", &ident.to_string()), Span::call_site());
+                        quote! {
+                          pub fn #mut_ident(&mut self) -> &mut #ty {
+                            &mut self.#ident
+                          }
                         }
-                      }
                     }
-                }
-                MethodType::Fn(m) => {
-                    let ident = &m.ident;
-                    let args = m
-                        .decl
-                        .inputs
-                        .iter()
-                        .filter(|arg| match arg {
-                            FnArg::Captured(_) => true,
-                            _ => false,
-                        })
-                        .map(|arg| {
-                            if let FnArg::Captured(a) = arg {
-                                &a.pat
-                            } else {
-                                panic!();
-                            }
-                        })
-                        .collect::<Vec<_>>();
-
-                    let variants = method
-                        .states
-                        .iter()
-                        .map(|state| {
-                            let a = args.clone();
-                            if method.default.is_default() {
-                                quote! {
-                                  #machine_name::#state(ref v) => v.#ident( #(#a),* ),
-                                }
-                            } else {
-                                quote! {
-                                  #machine_name::#state(ref v) => Some(v.#ident( #(#a),* )),
-                                }
-                            }
-                        })
-                        .collect::<Vec<_>>();
-
-                    let inputs = &m.decl.inputs;
-                    let output = match &m.decl.output {
-                        ReturnType::Default => quote! {},
-                        ReturnType::Type(arrow, ty) => {
-                            if method.default.is_default() {
-                                quote! {
-                                  #arrow #ty
-                                }
-                            } else {
-                                quote! {
-                                  #arrow Option<#ty>
-                                }
-                            }
-                        }
-                    };
-
-                    match method.default {
-                        DefaultValue::None => {
-                            quote! {
-                              pub fn #ident(#inputs) #output {
-                                match self {
-                                  #(#variants)*
-                                  _ => None,
-                                }
-                              }
-                            }
-                        }
-                        DefaultValue::Default => {
-                            quote! {
-                              pub fn #ident(#inputs) #output {
-                                match self {
-                                  #(#variants)*
-                                  _ => std::default::Default::default(),
-                                }
-                              }
-                            }
-                        }
-                        DefaultValue::Val(ref expr) => {
-                            quote! {
-                              pub fn #ident(#inputs) #output {
-                                match self {
-                                  #(#variants)*
-                                  _ => #expr,
-                                }
-                              }
-                            }
-                        }
+                    MethodType::Fn(_) => {
+                        // we let the user implement these methods on the types
+                        quote! {}
                     }
                 }
             })
             .collect::<Vec<_>>();
 
-        let toks = quote! {
-          impl #machine_name {
-            #(#wrapper_methods)*
-          }
+        let tokens = quote! {
+            impl #state {
+                #(#method_tokens)*
+            }
         };
 
-        stream.extend(proc_macro::TokenStream::from(toks));
+        proc_macro::TokenStream::from(tokens)
+    }
 
-        let file_name = format!("target/{}.rs", machine_name.to_string().to_lowercase());
-        OpenOptions::new()
-            .create(true)
-            .write(true)
-            .open(&file_name)
-            .and_then(|mut file| {
-                file.seek(std::io::SeekFrom::End(0))?;
-                file.write_all(stream.to_string().as_bytes())?;
-                file.flush()
+    pub fn generate_impl(&self) -> syn::export::TokenStream {
+        let machine_name = &self.machine_name;
+
+        let wrapper_methods = self
+            .methods
+            .iter()
+            .map(|method| match &method.method_type {
+                MethodType::Get(ident, ty) => self.generate_getter(method, ident, ty),
+                MethodType::Set(ident, ty) => self.generate_setter(method, ident, ty),
+                MethodType::Fn(signature) => self.generate_fn(method, signature),
             })
-            .expect("error writing methods");
+            .collect::<Vec<_>>();
 
-        (machine_name, stream)
+        let tokens = quote! {
+            impl #machine_name {
+                #(#wrapper_methods)*
+            }
+        };
+
+        proc_macro::TokenStream::from(tokens)
+    }
+
+    fn generate_getter(
+        &self,
+        method: &Method,
+        ident: &syn::Ident,
+        ty: &syn::Type,
+    ) -> syn::export::TokenStream2 {
+        let machine_name = &self.machine_name;
+
+        let variants = method
+            .states
+            .iter()
+            .map(|state| {
+                quote! {
+                    #machine_name::#state(ref v) => Some(v.#ident()),
+                }
+            })
+            .collect::<Vec<_>>();
+
+        let tokens = quote! {
+            pub fn #ident(&self) -> Option<&#ty> {
+                match self {
+                    #(#variants)*
+                    _ => None,
+                }
+            }
+        };
+
+        tokens
+    }
+
+    fn generate_setter(
+        &self,
+        method: &Method,
+        ident: &syn::Ident,
+        ty: &syn::Type,
+    ) -> syn::export::TokenStream2 {
+        let machine_name = &self.machine_name;
+
+        let mut_ident = Ident::new(&format!("{}_mut", &ident.to_string()), Span::call_site());
+
+        let variants = method
+            .states
+            .iter()
+            .map(|state| {
+                quote! {
+                    #machine_name::#state(ref mut v) => Some(v.#mut_ident()),
+                }
+            })
+            .collect::<Vec<_>>();
+
+        let tokens = quote! {
+            pub fn #mut_ident(&mut self) -> Option<&mut #ty> {
+                match self {
+                    #(#variants)*
+                    _ => None,
+                }
+            }
+        };
+
+        tokens
+    }
+
+    fn generate_fn(
+        &self,
+        method: &Method,
+        signature: &syn::MethodSig,
+    ) -> syn::export::TokenStream2 {
+        let machine_name = &self.machine_name;
+
+        let ident = &signature.ident;
+        let args = signature
+            .decl
+            .inputs
+            .iter()
+            .filter(|arg| match arg {
+                FnArg::Captured(_) => true,
+                _ => false,
+            })
+            .map(|arg| {
+                if let FnArg::Captured(a) = arg {
+                    &a.pat
+                } else {
+                    panic!();
+                }
+            })
+            .collect::<Vec<_>>();
+
+        let variants = method
+            .states
+            .iter()
+            .map(|state| {
+                let a = args.clone();
+                if method.default.is_default() {
+                    quote! {
+                        #machine_name::#state(ref v) => v.#ident( #(#a),* ),
+                    }
+                } else {
+                    quote! {
+                        #machine_name::#state(ref v) => Some(v.#ident( #(#a),* )),
+                    }
+                }
+            })
+            .collect::<Vec<_>>();
+
+        let inputs = &signature.decl.inputs;
+        let output = match &signature.decl.output {
+            ReturnType::Default => quote! {},
+            ReturnType::Type(arrow, ty) => {
+                if method.default.is_default() {
+                    quote! {
+                        #arrow #ty
+                    }
+                } else {
+                    quote! {
+                        #arrow Option<#ty>
+                    }
+                }
+            }
+        };
+
+        match method.default {
+            DefaultValue::None => {
+                quote! {
+                    pub fn #ident(#inputs) #output {
+                        match self {
+                            #(#variants)*
+                            _ => None,
+                        }
+                    }
+                }
+            }
+            DefaultValue::Default => {
+                quote! {
+                    pub fn #ident(#inputs) #output {
+                        match self {
+                            #(#variants)*
+                            _ => std::default::Default::default(),
+                        }
+                    }
+                }
+            }
+            DefaultValue::Val(ref expr) => {
+                quote! {
+                    pub fn #ident(#inputs) #output {
+                        match self {
+                            #(#variants)*
+                            _ => #expr,
+                        }
+                    }
+                }
+            }
+        }
     }
 }

@@ -21,7 +21,7 @@ transitions!(Traffic,
     (Green, Advance) => Orange,
     (Orange, Advance) => Red,
     (Red, Advance) => Green,
-    (Green, PassCar) => [Green, Orange]
+    (Green, PassCar) => [Green, Orange],
   ]
 );
 

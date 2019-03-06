@@ -1036,21 +1036,20 @@ impl Parse for ParenVal {
 
 impl Parse for Method {
     fn parse(input: ParseStream) -> Result<Self> {
-        let mut states = Vec::new();
+        let states: Vec<_> = match input.parse::<Ident>() {
+            Ok(i) => vec![i],
+            Err(_) => {
+                let content;
+                bracketed!(content in input);
 
-        let state: Ident = input.parse()?;
-        states.push(state);
+                let punctuated: Punctuated<Ident, Token![,]> =
+                    content.parse_terminated(Ident::parse)?;
 
-        loop {
-            let lookahead = input.lookahead1();
-            if lookahead.peek(Token![,]) {
-                let _: Token![,] = input.parse()?;
-                let state: Ident = input.parse()?;
-                states.push(state);
-            } else {
-                break;
+                let states: Vec<_> = punctuated.into_iter().collect();
+
+                states
             }
-        }
+        };
 
         let _: Token![=>] = input.parse()?;
         let default_token: Option<Token![default]> = input.parse()?;

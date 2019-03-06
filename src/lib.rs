@@ -999,21 +999,9 @@ impl Parse for Methods {
         let content;
         bracketed!(content in input);
 
-        let mut methods = Vec::new();
+        let punctuated: Punctuated<Method, Token![,]> = content.parse_terminated(Method::parse)?;
 
-        let t: Method = content.parse()?;
-        methods.push(t);
-
-        loop {
-            let lookahead = content.lookahead1();
-            if lookahead.peek(Token![,]) {
-                let _: Token![,] = content.parse()?;
-                let t: Method = content.parse()?;
-                methods.push(t);
-            } else {
-                break;
-            }
-        }
+        let methods: Vec<_> = punctuated.into_iter().collect();
 
         Ok(Methods {
             machine_name,

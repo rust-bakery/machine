@@ -60,7 +60,7 @@ methods!(Traffic,
   [
     Green => get count: u8,
     Green => set count: u8,
-    [Green, Orange, Red,] => fn can_pass(&self) -> bool
+    [Green, Orange, Red,] => fn can_pass(&self) -> bool,
   ]
 );
 

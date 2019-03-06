@@ -392,14 +392,6 @@
 
 extern crate case;
 extern crate proc_macro;
-/*
-#[macro_use] mod dynamic_machine;
-
-#[macro_export]
-macro_rules! machine(
-  ( $($token:tt)* ) => ( static_machine!( $($token)* ); );
-);
-*/
 
 #[macro_use]
 extern crate log;

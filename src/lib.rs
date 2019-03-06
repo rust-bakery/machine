@@ -392,6 +392,7 @@
 
 extern crate case;
 extern crate proc_macro;
+
 /*
 #[macro_use] mod dynamic_machine;
 
@@ -409,16 +410,19 @@ extern crate syn;
 extern crate quote;
 
 use std::collections::HashMap;
-use std::fs::{File, OpenOptions};
-use std::io::{Seek, Write};
+use std::fs::{self, OpenOptions};
+use std::io::Write;
 
 use case::CaseExt;
-use syn::export::Span;
-use syn::parse::{Parse, ParseStream, Result};
+
 use syn::{
+    export::Span,
+    parse::{Parse, ParseStream, Result},
     Abi, Attribute, Expr, FnArg, FnDecl, Generics, Ident, ItemEnum, MethodSig, ReturnType, Type,
     WhereClause,
 };
+
+static OUTPUT_DIR: &'static str = "target/machine";
 
 struct Machine {
     attributes: Vec<Attribute>,
@@ -439,20 +443,28 @@ pub fn machine(input: proc_macro::TokenStream) -> syn::export::TokenStream {
     let ast = parse_macro_input!(input as Machine);
 
     // Build the impl
-    let (name, gen) = impl_machine(&ast);
+    let (name, stream) = impl_machine(&ast);
 
-    trace!("generated: {}", gen);
+    trace!("generated: {}", stream);
 
-    let file_name = format!("target/{}.rs", name.to_string().to_lowercase());
-    File::create(&file_name)
+    let output_dir = format!("{}/{}", OUTPUT_DIR, name.to_string().to_lowercase());
+
+    fs::create_dir_all(&output_dir).expect("error creating directory");
+
+    let file_name = format!("{}/machine.rs", output_dir);
+
+    OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open(&file_name)
         .and_then(|mut file| {
-            file.seek(std::io::SeekFrom::End(0))?;
-            file.write_all(gen.to_string().as_bytes())?;
+            file.write_all(stream.to_string().as_bytes())?;
             file.flush()
         })
         .expect("error writing machine definition");
 
-    gen
+    stream
 }
 
 fn impl_machine(m: &Machine) -> (&Ident, syn::export::TokenStream) {
@@ -644,14 +656,15 @@ impl Parse for Transition {
 
 impl Transitions {
     pub fn render(&self) {
-        let file_name = format!(
-            "target/{}.dot",
+        let output_dir = format!(
+            "{}/{}",
+            OUTPUT_DIR,
             self.machine_name.to_string().to_lowercase()
         );
-        let mut file = File::create(&file_name).expect("error opening dot file");
 
-        file.write_all(format!("digraph {} {{\n", self.machine_name.to_string()).as_bytes())
-            .expect("error writing to dot file");
+        let file_name = format!("{}/states.dot", output_dir);
+
+        let mut string = format!("digraph {} {{\n", self.machine_name.to_string());
 
         let mut edges = Vec::new();
         for transition in self.transitions.iter() {
@@ -661,15 +674,24 @@ impl Transitions {
         }
 
         for edge in edges.iter() {
-            file.write_all(
-                &format!("{} -> {} [ label = \"{}\" ];\n", edge.0, edge.2, edge.1).as_bytes(),
-            )
-            .expect("error writing to dot file");
+            string.push_str(&format!(
+                "    {} -> {} [ label = \"{}\" ];\n",
+                edge.0, edge.2, edge.1
+            ))
         }
 
-        file.write_all(&b"}"[..])
-            .expect("error writing to dot file");
-        file.flush().expect("error flushhing dot file");
+        string.push_str("}");
+
+        OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(&file_name)
+            .and_then(|mut file| {
+                file.write_all(string.as_bytes())?;
+                file.flush()
+            })
+            .expect("error writing dot file");
     }
 }
 
@@ -748,15 +770,18 @@ pub fn transitions(input: proc_macro::TokenStream) -> syn::export::TokenStream {
 
     stream.extend(proc_macro::TokenStream::from(toks));
 
+    let output_dir = format!("{}/{}", OUTPUT_DIR, machine_name.to_string().to_lowercase());
+
     //println!("generated: {:?}", gen);
     trace!("generated transitions: {}", stream);
-    let file_name = format!("target/{}.rs", machine_name.to_string().to_lowercase());
+    let file_name = format!("{}/transitions.rs", output_dir);
+
     OpenOptions::new()
         .create(true)
         .write(true)
+        .truncate(true)
         .open(&file_name)
         .and_then(|mut file| {
-            file.seek(std::io::SeekFrom::End(0))?;
             file.write_all(stream.to_string().as_bytes())?;
             file.flush()
         })
@@ -961,13 +986,15 @@ pub fn methods(input: proc_macro::TokenStream) -> syn::export::TokenStream {
 
     stream.extend(proc_macro::TokenStream::from(toks));
 
-    let file_name = format!("target/{}.rs", machine_name.to_string().to_lowercase());
+    let output_dir = format!("{}/{}", OUTPUT_DIR, machine_name.to_string().to_lowercase());
+
+    let file_name = format!("{}/methods.rs", output_dir);
     OpenOptions::new()
         .create(true)
         .write(true)
+        .truncate(true)
         .open(&file_name)
         .and_then(|mut file| {
-            file.seek(std::io::SeekFrom::End(0))?;
             file.write_all(stream.to_string().as_bytes())?;
             file.flush()
         })

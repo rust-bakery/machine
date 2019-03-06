@@ -129,18 +129,29 @@ impl Transitions {
     }
 
     pub fn generate(&self) -> (&Ident, syn::export::TokenStream) {
-        //println!("\ninput: {:?}", input);
         let mut stream = proc_macro::TokenStream::new();
 
+        let machine_name = &self.machine_name;
         self.render();
 
-        let machine_name = &self.machine_name;
 
         let mut messages = HashMap::new();
         for t in self.transitions.iter() {
             let entry = messages.entry(&t.message).or_insert(Vec::new());
             entry.push((&t.start, &t.end));
         }
+
+        stream.extend(self.generate_messages_enum(&messages));
+        stream.extend(self.generate_impl(&messages));
+
+        (machine_name, stream)
+    }
+
+    fn generate_messages_enum(
+        &self,
+        messages: &HashMap<&syn::Ident, Vec<(&syn::Ident, &Vec<syn::Ident>)>>,
+    ) -> syn::export::TokenStream {
+        let machine_name = &self.machine_name;
 
         // create an enum from the messages
         let message_enum_ident = Ident::new(
@@ -150,55 +161,68 @@ impl Transitions {
         let variants_names = &messages.keys().collect::<Vec<_>>();
         let structs_names = variants_names.clone();
 
-        // define the state enum
-        let toks = quote! {
+        let tokens = quote! {
           #[derive(Clone,Debug,PartialEq)]
           pub enum #message_enum_ident {
             #(#variants_names(#structs_names)),*
           }
         };
 
-        stream.extend(proc_macro::TokenStream::from(toks));
+        proc_macro::TokenStream::from(tokens)
+    }
+
+    fn generate_fn(
+        &self,
+        message: &syn::Ident,
+        moves: &[(&syn::Ident, &Vec<syn::Ident>)],
+    ) -> syn::export::TokenStream2 {
+        let machine_name = &self.machine_name;
+
+        let fn_ident = Ident::new(
+            &format!("on_{}", &message.to_string().to_snake()),
+            Span::call_site(),
+        );
+
+        let mv: Vec<_> = moves.iter().map(|(start, end)| {
+            if end.len() == 1 {
+                let end_state = &end[0];
+                quote!{
+                    #machine_name::#start(state) => #machine_name::#end_state(state.#fn_ident(input)),
+                }
+            } else {
+                quote!{
+                    #machine_name::#start(state) => state.#fn_ident(input),
+                }
+            }
+        }).collect();
+
+        quote! {
+            pub fn #fn_ident(self, input: #message) -> #machine_name {
+                match self {
+                #(#mv)*
+                    _ => #machine_name::Error,
+                }
+            }
+        }
+    }
+
+    fn generate_impl(
+        &self,
+        messages: &HashMap<&syn::Ident, Vec<(&syn::Ident, &Vec<syn::Ident>)>>,
+    ) -> syn::export::TokenStream {
+        let machine_name = &self.machine_name;
 
         let functions = messages
             .iter()
-            .map(|(msg, moves)| {
-                let fn_ident = Ident::new(
-                    &format!("on_{}", &msg.to_string().to_snake()),
-                    Span::call_site(),
-                );
-                let mv = moves.iter().map(|(start, end)| {
-        if end.len() == 1 {
-          let end_state = &end[0];
-          quote!{
-            #machine_name::#start(state) => #machine_name::#end_state(state.#fn_ident(input)),
-          }
-        } else {
-          quote!{
-            #machine_name::#start(state) => state.#fn_ident(input),
-          }
-        }
-      }).collect::<Vec<_>>();
-
-                quote! {
-                  pub fn #fn_ident(self, input: #msg) -> #machine_name {
-                    match self {
-                    #(#mv)*
-                      _ => #machine_name::Error,
-                    }
-                  }
-                }
-            })
+            .map(|(message, moves)| self.generate_fn(message, moves.as_slice()))
             .collect::<Vec<_>>();
 
-        let toks = quote! {
+        let tokens = quote! {
           impl #machine_name {
             #(#functions)*
           }
         };
 
-        stream.extend(proc_macro::TokenStream::from(toks));
-
-        (machine_name, stream)
+        proc_macro::TokenStream::from(tokens)
     }
 }

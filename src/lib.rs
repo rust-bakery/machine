@@ -604,22 +604,10 @@ impl Parse for Transition {
                 let content;
                 bracketed!(content in input);
 
-                //println!("content: {:?}", content);
-                let mut states = Vec::new();
+                let punctuated: Punctuated<Ident, Token![,]> =
+                    content.parse_terminated(Ident::parse)?;
 
-                let t: Ident = content.parse()?;
-                states.push(t);
-
-                loop {
-                    let lookahead = content.lookahead1();
-                    if lookahead.peek(Token![,]) {
-                        let _: Token![,] = content.parse()?;
-                        let t: Ident = content.parse()?;
-                        states.push(t);
-                    } else {
-                        break;
-                    }
-                }
+                let states: Vec<_> = punctuated.into_iter().collect();
 
                 states
             }

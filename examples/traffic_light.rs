@@ -2,7 +2,7 @@
 extern crate machine;
 
 machine!(
-  #[derive(Clone,Debug,PartialEq)]
+  #[derive(Clone, Debug, PartialEq)]
   enum Traffic {
     Green { count: u8 },
     Orange,
@@ -10,11 +10,13 @@ machine!(
   }
 );
 
-#[derive(Clone,Debug,PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Advance;
 
-#[derive(Clone,Debug,PartialEq)]
-pub struct PassCar { count: u8 }
+#[derive(Clone, Debug, PartialEq)]
+pub struct PassCar {
+  count: u8,
+}
 
 transitions!(Traffic,
   [
@@ -39,7 +41,6 @@ impl Green {
       Traffic::green(count)
     }
   }
-
 }
 
 impl Orange {
@@ -50,9 +51,7 @@ impl Orange {
 
 impl Red {
   pub fn on_advance(self, _: Advance) -> Green {
-    Green {
-      count: 0
-    }
+    Green { count: 0 }
   }
 }
 
@@ -84,8 +83,8 @@ impl Red {
 
 fn main() {
   let mut t = Traffic::Green(Green { count: 0 });
-  t = t.on_pass_car(PassCar { count: 1});
-  t = t.on_pass_car(PassCar { count: 2});
+  t = t.on_pass_car(PassCar { count: 1 });
+  t = t.on_pass_car(PassCar { count: 2 });
   assert_eq!(t, Traffic::green(3));
   t = t.on_advance(Advance);
   assert_eq!(t, Traffic::orange());

@@ -454,6 +454,20 @@ pub fn transitions(input: proc_macro::TokenStream) -> syn::export::TokenStream {
         })
         .expect("error writing machine definition");
 
+    let rendered = transitions.render_dot();
+
+    let file_name = format!("target/{}.dot", name.to_string().to_lowercase());
+    File::create(&file_name)
+        .and_then(|mut file| {
+            file.seek(std::io::SeekFrom::End(0))?;
+            file.write_all(rendered.as_bytes())?;
+            file.flush()?;
+
+            trace!("wrote dot file: {:?}", file_name);
+            Ok(())
+        })
+        .expect("error writing dot file");
+
     stream
 }
 

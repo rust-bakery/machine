@@ -1,6 +1,4 @@
 use std::collections::HashMap;
-use std::fs::File;
-use std::io::Write;
 
 use case::CaseExt;
 use syn::export::Span;
@@ -99,15 +97,8 @@ impl Parse for Transition {
 }
 
 impl Transitions {
-    pub fn render(&self) {
-        let file_name = format!(
-            "target/{}.dot",
-            self.machine_name.to_string().to_lowercase()
-        );
-        let mut file = File::create(&file_name).expect("error opening dot file");
-
-        file.write_all(format!("digraph {} {{\n", self.machine_name.to_string()).as_bytes())
-            .expect("error writing to dot file");
+    pub fn render_dot(&self) -> String {
+        let mut string = format!("digraph {} {{\n", self.machine_name.to_string());
 
         let mut edges = Vec::new();
         for transition in self.transitions.iter() {
@@ -117,23 +108,21 @@ impl Transitions {
         }
 
         for edge in edges.iter() {
-            file.write_all(
-                &format!("{} -> {} [ label = \"{}\" ];\n", edge.0, edge.2, edge.1).as_bytes(),
-            )
-            .expect("error writing to dot file");
+            string.push_str(&format!(
+                "    {} -> {} [ label = \"{}\" ];\n",
+                edge.0, edge.2, edge.1
+            ))
         }
 
-        file.write_all(&b"}"[..])
-            .expect("error writing to dot file");
-        file.flush().expect("error flushhing dot file");
+        string.push_str("}");
+
+        string
     }
 
     pub fn generate(&self) -> (&Ident, syn::export::TokenStream) {
         let mut stream = proc_macro::TokenStream::new();
 
         let machine_name = &self.machine_name;
-        self.render();
-
 
         let mut messages = HashMap::new();
         for t in self.transitions.iter() {

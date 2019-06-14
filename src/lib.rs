@@ -699,7 +699,8 @@ pub fn transitions(input: proc_macro::TokenStream) -> syn::export::TokenStream {
 
     let mut type_arguments = HashSet::new();
     for t in transitions.transitions.iter() {
-      type_arguments.extend(type_args(&t.message).drain());
+      let mut args = type_args(&t.message);
+      type_arguments.extend(args.drain());
     }
 
     let type_arguments = reorder_type_arguments(type_arguments);

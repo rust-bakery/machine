@@ -10,8 +10,8 @@
 //! * transitions can have multiple end states if needed (conditions depending on message content, etc)
 //! * accessors can be generated for state members
 //! * wrapper methods and accessors are generated on the parent enum
-//! * the generated code is also written in the `target/` directory for further inspection
-//! * a dot file is written in the `target/` directory for graph generation
+//! * the generated code is also written in the `target/machine` directory for further inspection
+//! * a dot file is written in the `target/machine` directory for graph generation
 //!
 //! ## Usage
 //!
@@ -248,9 +248,9 @@
 //! }
 //! ```
 //!
-//! The complete generated code can be found in `target/traffic.rs`.
+//! The complete generated code can be found in `target/machine/traffic.rs`.
 //!
-//! The machine crate will also generate the `target/traffic.dot` file
+//! The machine crate will also generate the `target/machine/traffic.dot` file
 //! for graphviz usage:
 //!
 //! ```dot
@@ -263,7 +263,7 @@
 //! }
 //! ```
 //!
-//! `dot -Tpng target/traffic.dot > traffic.png` will generate the following image:
+//! `dot -Tpng target/machine/traffic.dot > traffic.png` will generate the following image:
 //!
 //! ![traffic light transitions graph](https://raw.githubusercontent.com/rust-bakery/machine/master/assets/traffic.png)
 //!
@@ -409,7 +409,7 @@ extern crate syn;
 extern crate quote;
 
 use std::collections::HashMap;
-use std::fs::{File, OpenOptions};
+use std::fs::{File, OpenOptions, create_dir};
 use std::io::{Seek, Write};
 
 use case::CaseExt;
@@ -443,7 +443,8 @@ pub fn machine(input: proc_macro::TokenStream) -> syn::export::TokenStream {
 
     trace!("generated: {}", gen);
 
-    let file_name = format!("target/{}.rs", name.to_string().to_lowercase());
+    let file_name = format!("target/machine/{}.rs", name.to_string().to_lowercase());
+    let _ = create_dir("target/machine");
     File::create(&file_name)
         .and_then(|mut file| {
             file.seek(std::io::SeekFrom::End(0))?;
@@ -645,9 +646,10 @@ impl Parse for Transition {
 impl Transitions {
     pub fn render(&self) {
         let file_name = format!(
-            "target/{}.dot",
+            "target/machine/{}.dot",
             self.machine_name.to_string().to_lowercase()
         );
+        let _ = create_dir("target/machine");
         let mut file = File::create(&file_name).expect("error opening dot file");
 
         file.write_all(format!("digraph {} {{\n", self.machine_name.to_string()).as_bytes())
@@ -775,7 +777,8 @@ pub fn transitions(input: proc_macro::TokenStream) -> syn::export::TokenStream {
 
     //println!("generated: {:?}", gen);
     trace!("generated transitions: {}", stream);
-    let file_name = format!("target/{}.rs", machine_name.to_string().to_lowercase());
+    let _ = create_dir("target/machine");
+    let file_name = format!("target/machine/{}.rs", machine_name.to_string().to_lowercase());
     OpenOptions::new()
         .create(true)
         .write(true)
@@ -986,7 +989,8 @@ pub fn methods(input: proc_macro::TokenStream) -> syn::export::TokenStream {
 
     stream.extend(proc_macro::TokenStream::from(toks));
 
-    let file_name = format!("target/{}.rs", machine_name.to_string().to_lowercase());
+    let file_name = format!("target/machine/{}.rs", machine_name.to_string().to_lowercase());
+    let _ = create_dir("target/machine");
     OpenOptions::new()
         .create(true)
         .write(true)

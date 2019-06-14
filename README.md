@@ -14,8 +14,8 @@ without writing the associated boilerplate.
 * transitions can have multiple end states if needed (conditions depending on message content, etc)
 * accessors can be generated for state members
 * wrapper methods and accessors are generated on the parent enum
-* the generated code is also written in the `target/` directory for further inspection
-* a dot file is written in the `target/` directory for graph generation
+* the generated code is also written in the `target/machine` directory for further inspection
+* a dot file is written in the `target/machine` directory for graph generation
 
 ## Usage
 
@@ -252,9 +252,9 @@ impl Traffic {
 }
 ```
 
-The complete generated code can be found in `target/traffic.rs`.
+The complete generated code can be found in `target/machine/traffic.rs`.
 
-The machine crate will also generate the `target/traffic.dot` file
+The machine crate will also generate the `target/machine/traffic.dot` file
 for graphviz usage:
 
 ```dot
@@ -267,7 +267,7 @@ Green -> Orange [ label = "PassCar" ];
 }
 ```
 
-`dot -Tpng target/traffic.dot > traffic.png` will generate the following image:
+`dot -Tpng target/machine/traffic.dot > traffic.png` will generate the following image:
 
 ![traffic light transitions graph](https://raw.githubusercontent.com/rust-bakery/machine/master/assets/traffic.png)
 

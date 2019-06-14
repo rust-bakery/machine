@@ -710,39 +710,64 @@ pub fn transitions(input: proc_macro::TokenStream) -> syn::export::TokenStream {
     stream.extend(proc_macro::TokenStream::from(toks));
 
     let functions = messages
-        .iter()
-        .map(|(msg, moves)| {
-            let fn_ident = Ident::new(
-                &format!("on_{}", &msg.to_string().to_snake()),
-                Span::call_site(),
-            );
-            let mv = moves.iter().map(|(start, end)| {
-        if end.len() == 1 {
-          let end_state = &end[0];
-          quote!{
-            #machine_name::#start(state) => #machine_name::#end_state(state.#fn_ident(input)),
+      .iter()
+      .map(|(msg, moves)| {
+        let fn_ident = Ident::new(
+          &format!("on_{}", &msg.to_string().to_snake()),
+          Span::call_site(),
+          );
+        let mv = moves.iter().map(|(start, end)| {
+          if end.len() == 1 {
+            let end_state = &end[0];
+            quote!{
+              #machine_name::#start(state) => #machine_name::#end_state(state.#fn_ident(input)),
+            }
+          } else {
+            quote!{
+              #machine_name::#start(state) => state.#fn_ident(input),
+            }
           }
-        } else {
-          quote!{
-            #machine_name::#start(state) => state.#fn_ident(input),
+        }).collect::<Vec<_>>();
+
+        quote! {
+          pub fn #fn_ident(self, input: #msg) -> #machine_name {
+            match self {
+              #(#mv)*
+              _ => #machine_name::Error,
+            }
           }
         }
-      }).collect::<Vec<_>>();
+      })
+    .collect::<Vec<_>>();
 
-            quote! {
-              pub fn #fn_ident(self, input: #msg) -> #machine_name {
-                match self {
-                #(#mv)*
-                  _ => #machine_name::Error,
-                }
-              }
-            }
-        })
-        .collect::<Vec<_>>();
+    let matches = messages
+      .keys()
+      .map(|msg| {
+        let fn_ident = Ident::new(
+          &format!("on_{}", &msg.to_string().to_snake()),
+          Span::call_site(),
+          );
+          quote!{
+            #message_enum_ident::#msg(message) => self.#fn_ident(message),
+          }
+
+      })
+    .collect::<Vec<_>>();
+
+    let execute = quote! {
+      pub fn execute(self, input: #message_enum_ident) -> #machine_name {
+        match input {
+          #(#matches)*
+          _ => #machine_name::Error,
+        }
+      }
+    };
 
     let toks = quote! {
       impl #machine_name {
         #(#functions)*
+
+        #execute
       }
     };
 

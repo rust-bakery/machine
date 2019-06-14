@@ -11,21 +11,23 @@ machine!(
   }
 );
 
-#[derive(Clone,Debug,PartialEq)]
-pub struct Advance;
+pub mod prefix {
+  #[derive(Clone,Debug,PartialEq)]
+  pub struct Advance;
+}
 
 #[derive(Clone,Debug,PartialEq)]
-pub struct PassCar { count: u8 }
+pub struct PassCar<'a, T> { count: u8, name: &'a T }
 
 #[derive(Clone,Debug,PartialEq)]
 pub struct Toggle;
 
 transitions!(TrafficLight,
   [
-    (Green, Advance) => Orange,
-    (Orange, Advance) => Red,
-    (Red, Advance) => Green,
-    (Green, PassCar) => [Green, Orange],
+    (Green, prefix::Advance) => Orange,
+    (Orange, prefix::Advance) => Red,
+    (Red, prefix::Advance) => Green,
+    (Green, PassCar<'a, T>) => [Green, Orange],
     (Green, Toggle) => BlinkingOrange,
     (Orange, Toggle) => BlinkingOrange,
     (Red, Toggle) => BlinkingOrange,
@@ -42,11 +44,11 @@ methods!(TrafficLight,
 );
 
 impl Green {
-  pub fn on_advance(self, _: Advance) -> Orange {
+  pub fn on_advance(self, _: prefix::Advance) -> Orange {
     Orange {}
   }
 
-  pub fn on_pass_car(self, input: PassCar) -> TrafficLight {
+  pub fn on_pass_car<'a, T>(self, input: PassCar<'a, T>) -> TrafficLight {
     let count = self.count + input.count;
     if count >= 10 {
       println!("reached max cars count: {}", count);
@@ -66,7 +68,7 @@ impl Green {
 }
 
 impl Orange {
-  pub fn on_advance(self, _: Advance) -> Red {
+  pub fn on_advance(self, _: prefix::Advance) -> Red {
     Red {}
   }
 
@@ -80,7 +82,7 @@ impl Orange {
 }
 
 impl Red {
-  pub fn on_advance(self, _: Advance) -> Green {
+  pub fn on_advance(self, _: prefix::Advance) -> Green {
     Green {
       count: 0
     }
@@ -107,9 +109,11 @@ impl BlinkingOrange {
 
 #[test]
 fn test() {
+  use prefix::Advance;
+
   let mut t = TrafficLight::Green(Green { count: 0 });
-  t = t.on_pass_car(PassCar { count: 1});
-  t = t.on_pass_car(PassCar { count: 2});
+  t = t.on_pass_car(PassCar { count: 1, name: &"test".to_string() });
+  t = t.on_pass_car(PassCar { count: 2, name: &"test".to_string() });
   assert_eq!(t, TrafficLight::green(3));
   t = t.on_advance(Advance);
   //println!("trace: {}", t.print_trace());
@@ -120,13 +124,13 @@ fn test() {
 
   t = t.on_advance(Advance);
   assert_eq!(t, TrafficLight::green(0));
-  t = t.on_pass_car(PassCar { count: 5 });
+  t = t.on_pass_car(PassCar { count: 5, name: &"test".to_string() });
   assert_eq!(t, TrafficLight::green(5));
-  t = t.on_pass_car(PassCar { count: 7 });
+  t = t.on_pass_car(PassCar { count: 7, name: &"test".to_string() });
   assert_eq!(t, TrafficLight::orange());
   t = t.on_advance(Advance);
   assert_eq!(t, TrafficLight::red());
-  t = t.on_pass_car(PassCar { count: 7 });
+  t = t.on_pass_car(PassCar { count: 7, name: &"test".to_string() });
   assert_eq!(t, TrafficLight::error());
   t = t.on_advance(Advance);
   assert_eq!(t, TrafficLight::error());

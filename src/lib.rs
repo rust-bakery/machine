@@ -408,17 +408,19 @@ extern crate syn;
 #[macro_use]
 extern crate quote;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs::{File, OpenOptions, create_dir};
 use std::io::{Seek, Write};
 
 use case::CaseExt;
 use syn::export::Span;
+use syn::punctuated::Pair;
 use syn::parse::{Parse, ParseStream, Result};
 use syn::{
     Abi, Attribute, Expr, FnArg, FnDecl, Generics, Ident, ItemEnum, MethodSig, ReturnType, Type,
-    WhereClause,
+    WhereClause, PathArguments, GenericArgument,
 };
+use quote::ToTokens;
 
 struct Machine {
     attributes: Vec<Attribute>,
@@ -561,7 +563,7 @@ struct Transitions {
 #[derive(Debug)]
 struct Transition {
     pub start: Ident,
-    pub message: Ident,
+    pub message: Type,
     pub end: Vec<Ident>,
 }
 
@@ -604,7 +606,7 @@ impl Parse for Transition {
 
         let start: Ident = left.parse()?;
         let _: Token![,] = left.parse()?;
-        let message: Ident = left.parse()?;
+        let message: Type = left.parse()?;
 
         let _: Token![=>] = input.parse()?;
 
@@ -664,7 +666,7 @@ impl Transitions {
 
         for edge in edges.iter() {
             file.write_all(
-                &format!("{} -> {} [ label = \"{}\" ];\n", edge.0, edge.2, edge.1).as_bytes(),
+                &format!("{} -> {} [ label = \"{}\" ];\n", edge.0, edge.2, edge.1.into_token_stream()).as_bytes(),
             )
             .expect("error writing to dot file");
         }
@@ -693,29 +695,47 @@ pub fn transitions(input: proc_macro::TokenStream) -> syn::export::TokenStream {
         entry.push((&t.start, &t.end));
     }
 
+    //let mut message_types = transitions.transitions.iter().map(|t| &t.message).collect::<Vec<_>>();
+
+    let mut type_arguments = HashSet::new();
+    for t in transitions.transitions.iter() {
+      type_arguments.extend(type_args(&t.message).drain());
+    }
+
+    let type_arguments = reorder_type_arguments(type_arguments);
+
     // create an enum from the messages
     let message_enum_ident = Ident::new(
         &format!("{}Messages", &machine_name.to_string()),
         Span::call_site(),
     );
-    let variants_names = &messages.keys().collect::<Vec<_>>();
-    let structs_names = variants_names.clone();
+    let structs_names = messages.keys().collect::<Vec<_>>();
+    let variants_names = structs_names.iter().map(|t| type_last_ident(*t)).collect::<Vec<_>>();
+
+
+    let type_arg_toks = if type_arguments.is_empty() {
+      quote!{}
+    } else {
+      quote!{
+        < #(#type_arguments),* >
+      }
+    };
 
     // define the state enum
     let toks = quote! {
       #[derive(Clone,Debug,PartialEq)]
-      pub enum #message_enum_ident {
+      pub enum #message_enum_ident #type_arg_toks {
         #(#variants_names(#structs_names)),*
       }
     };
 
     stream.extend(proc_macro::TokenStream::from(toks));
-
     let functions = messages
       .iter()
       .map(|(msg, moves)| {
         let fn_ident = Ident::new(
-          &format!("on_{}", &msg.to_string().to_snake()),
+          //&format!("on_{}", &msg.to_string().to_snake()),
+          &format!("on_{}", type_to_snake(msg)),
           Span::call_site(),
           );
         let mv = moves.iter().map(|(start, end)| {
@@ -731,8 +751,17 @@ pub fn transitions(input: proc_macro::TokenStream) -> syn::export::TokenStream {
           }
         }).collect::<Vec<_>>();
 
+        let type_arguments = reorder_type_arguments(type_args(msg));
+        let type_arg_toks = if type_arguments.is_empty() {
+          quote!{}
+        } else {
+          quote!{
+            < #(#type_arguments),* >
+          }
+        };
+
         quote! {
-          pub fn #fn_ident(self, input: #msg) -> #machine_name {
+          pub fn #fn_ident #type_arg_toks(self, input: #msg) -> #machine_name {
             match self {
               #(#mv)*
               _ => #machine_name::Error,
@@ -746,18 +775,30 @@ pub fn transitions(input: proc_macro::TokenStream) -> syn::export::TokenStream {
       .keys()
       .map(|msg| {
         let fn_ident = Ident::new(
-          &format!("on_{}", &msg.to_string().to_snake()),
+          //&format!("on_{}", &msg.to_string().to_snake()),
+          &format!("on_{}", type_to_snake(msg)),
           Span::call_site(),
           );
+
+          let id = type_last_ident(msg);
+
           quote!{
-            #message_enum_ident::#msg(message) => self.#fn_ident(message),
+            #message_enum_ident::#id(message) => self.#fn_ident(message),
           }
 
       })
     .collect::<Vec<_>>();
 
+    /*let type_arg_toks = if type_arguments.is_empty() {
+      quote!{}
+    } else {
+      quote!{
+        < #(#type_arguments),* >
+      }
+    };*/
+
     let execute = quote! {
-      pub fn execute(self, input: #message_enum_ident) -> #machine_name {
+      pub fn execute #type_arg_toks(self, input: #message_enum_ident #type_arg_toks) -> #machine_name {
         match input {
           #(#matches)*
           _ => #machine_name::Error,
@@ -1174,4 +1215,69 @@ fn parse_method_sig(input: ParseStream) -> Result<MethodSig> {
             },
         },
     })
+}
+
+fn type_to_snake(t: &Type) -> String {
+  match t {
+    Type::Path(ref p) => {
+      match p.path.segments.last() {
+        Some(Pair::End(segment)) => {
+          segment.ident.to_string().to_snake()
+        },
+        _ => panic!("expected a path segment"),
+      }
+    },
+    t => panic!("expected a Type::Path, got {:?}", t),
+  }
+}
+
+fn type_last_ident(t: &Type) -> &Ident {
+  match t {
+    Type::Path(ref p) => {
+      match p.path.segments.last() {
+        Some(Pair::End(segment)) => {
+          &segment.ident
+        },
+        _ => panic!("expected a path segment"),
+      }
+    },
+    t => panic!("expected a Type::Path, got {:?}", t),
+  }
+}
+
+fn type_args(t: &Type) -> HashSet<GenericArgument> {
+  match t {
+    Type::Path(ref p) => {
+      match p.path.segments.last() {
+        Some(Pair::End(segment)) => {
+          match &segment.arguments {
+            PathArguments::AngleBracketed(a) => {
+              a.args.iter().cloned().collect()
+            },
+            PathArguments::None => HashSet::new(),
+            a => panic!("expected angle bracketed arguments, got {:?}", a),
+          }
+        },
+        _ => panic!("expected a path segment"),
+      }
+    },
+    t => panic!("expected a Type::Path, got {:?}", t),
+  }
+}
+
+// lifetimes must appear before other type arguments
+fn reorder_type_arguments(mut t: HashSet<GenericArgument>) -> Vec<GenericArgument> {
+  let mut lifetimes = Vec::new();
+  let mut others = Vec::new();
+
+  for arg in t.drain() {
+    if let GenericArgument::Lifetime(_) = arg {
+      lifetimes.push(arg);
+    } else {
+      others.push(arg);
+    }
+  }
+
+  lifetimes.extend(others.drain(..));
+  lifetimes
 }

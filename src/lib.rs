@@ -401,26 +401,18 @@ macro_rules! machine(
 );
 */
 
-#[macro_use]
-extern crate log;
-#[macro_use]
-extern crate syn;
-#[macro_use]
-extern crate quote;
-
 use std::collections::{HashMap, HashSet};
-use std::fs::{File, OpenOptions, create_dir};
+use std::fs::{create_dir, File, OpenOptions};
 use std::io::{Seek, Write};
 
 use case::CaseExt;
-use syn::export::Span;
-use syn::punctuated::Pair;
+use log::trace;
+use quote::{quote, ToTokens};
 use syn::parse::{Parse, ParseStream, Result};
 use syn::{
-    Abi, Attribute, Expr, FnArg, FnDecl, Generics, Ident, ItemEnum, MethodSig, ReturnType, Type,
-    WhereClause, PathArguments, GenericArgument,
+    bracketed, parenthesized, Abi, Attribute, Expr, FnArg, GenericArgument, Generics, Ident,
+    ItemEnum, PathArguments, ReturnType, Signature, Token, Type, WhereClause,
 };
-use quote::ToTokens;
 
 struct Machine {
     attributes: Vec<Attribute>,
@@ -437,8 +429,10 @@ impl Parse for Machine {
 }
 
 #[proc_macro]
-pub fn machine(input: proc_macro::TokenStream) -> syn::export::TokenStream {
-    let ast = parse_macro_input!(input as Machine);
+pub fn machine(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let input = proc_macro2::TokenStream::from(input);
+
+    let ast = syn::parse2(input).expect("Could not parse input");
 
     // Build the impl
     let (name, gen) = impl_machine(&ast);
@@ -455,10 +449,10 @@ pub fn machine(input: proc_macro::TokenStream) -> syn::export::TokenStream {
         })
         .expect("error writing machine definition");
 
-    gen
+    proc_macro::TokenStream::from(gen)
 }
 
-fn impl_machine(m: &Machine) -> (&Ident, syn::export::TokenStream) {
+fn impl_machine(m: &Machine) -> (&Ident, proc_macro2::TokenStream) {
     let Machine { attributes, data } = m;
     let ast = data;
     //println!("attributes: {:?}", attributes);
@@ -477,7 +471,7 @@ fn impl_machine(m: &Machine) -> (&Ident, syn::export::TokenStream) {
       }
     };
 
-    let mut stream = proc_macro::TokenStream::from(toks);
+    let mut stream = proc_macro2::TokenStream::from(toks);
 
     // define structs for each state
     for ref variant in ast.variants.iter() {
@@ -504,14 +498,17 @@ fn impl_machine(m: &Machine) -> (&Ident, syn::export::TokenStream) {
           }
         };
 
-        stream.extend(proc_macro::TokenStream::from(toks));
+        stream.extend(proc_macro2::TokenStream::from(toks));
     }
 
     let methods = &ast
         .variants
         .iter()
         .map(|variant| {
-            let fn_name = Ident::new(&variant.ident.to_string().to_snake(), Span::call_site());
+            let fn_name = Ident::new(
+                &variant.ident.to_string().to_snake(),
+                proc_macro2::Span::call_site(),
+            );
             let struct_name = &variant.ident;
 
             let args = &variant
@@ -549,7 +546,7 @@ fn impl_machine(m: &Machine) -> (&Ident, syn::export::TokenStream) {
       }
     };
 
-    stream.extend(proc_macro::TokenStream::from(toks));
+    stream.extend(proc_macro2::TokenStream::from(toks));
 
     (machine_name, stream)
 }
@@ -666,7 +663,13 @@ impl Transitions {
 
         for edge in edges.iter() {
             file.write_all(
-                &format!("{} -> {} [ label = \"{}\" ];\n", edge.0, edge.2, edge.1.into_token_stream()).as_bytes(),
+                &format!(
+                    "{} -> {} [ label = \"{}\" ];\n",
+                    edge.0,
+                    edge.2,
+                    edge.1.into_token_stream()
+                )
+                .as_bytes(),
             )
             .expect("error writing to dot file");
         }
@@ -678,11 +681,13 @@ impl Transitions {
 }
 
 #[proc_macro]
-pub fn transitions(input: proc_macro::TokenStream) -> syn::export::TokenStream {
+pub fn transitions(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     //println!("\ninput: {:?}", input);
-    let mut stream = proc_macro::TokenStream::new();
+    let mut stream = proc_macro2::TokenStream::new();
 
-    let transitions = parse_macro_input!(input as Transitions);
+    let input = proc_macro2::TokenStream::from(input);
+
+    let transitions: Transitions = syn::parse2(input).expect("Unable to parse transitions");
     trace!("\nparsed transitions: {:#?}", transitions);
 
     transitions.render();
@@ -699,8 +704,8 @@ pub fn transitions(input: proc_macro::TokenStream) -> syn::export::TokenStream {
 
     let mut type_arguments = HashSet::new();
     for t in transitions.transitions.iter() {
-      let mut args = type_args(&t.message);
-      type_arguments.extend(args.drain());
+        let mut args = type_args(&t.message);
+        type_arguments.extend(args.drain());
     }
 
     let type_arguments = reorder_type_arguments(type_arguments);
@@ -708,18 +713,20 @@ pub fn transitions(input: proc_macro::TokenStream) -> syn::export::TokenStream {
     // create an enum from the messages
     let message_enum_ident = Ident::new(
         &format!("{}Messages", &machine_name.to_string()),
-        Span::call_site(),
+        proc_macro2::Span::call_site(),
     );
     let structs_names = messages.keys().collect::<Vec<_>>();
-    let variants_names = structs_names.iter().map(|t| type_last_ident(*t)).collect::<Vec<_>>();
-
+    let variants_names = structs_names
+        .iter()
+        .map(|t| type_last_ident(*t))
+        .collect::<Vec<_>>();
 
     let type_arg_toks = if type_arguments.is_empty() {
-      quote!{}
+        quote! {}
     } else {
-      quote!{
-        < #(#type_arguments),* >
-      }
+        quote! {
+          < #(#type_arguments),* >
+        }
     };
 
     // define the state enum
@@ -730,16 +737,16 @@ pub fn transitions(input: proc_macro::TokenStream) -> syn::export::TokenStream {
       }
     };
 
-    stream.extend(proc_macro::TokenStream::from(toks));
+    stream.extend(proc_macro2::TokenStream::from(toks));
     let functions = messages
-      .iter()
-      .map(|(msg, moves)| {
-        let fn_ident = Ident::new(
-          //&format!("on_{}", &msg.to_string().to_snake()),
-          &format!("on_{}", type_to_snake(msg)),
-          Span::call_site(),
-          );
-        let mv = moves.iter().map(|(start, end)| {
+        .iter()
+        .map(|(msg, moves)| {
+            let fn_ident = Ident::new(
+                //&format!("on_{}", &msg.to_string().to_snake()),
+                &format!("on_{}", type_to_snake(msg)),
+                proc_macro2::Span::call_site(),
+            );
+            let mv = moves.iter().map(|(start, end)| {
           if end.len() == 1 {
             let end_state = &end[0];
             quote!{
@@ -752,43 +759,42 @@ pub fn transitions(input: proc_macro::TokenStream) -> syn::export::TokenStream {
           }
         }).collect::<Vec<_>>();
 
-        let type_arguments = reorder_type_arguments(type_args(msg));
-        let type_arg_toks = if type_arguments.is_empty() {
-          quote!{}
-        } else {
-          quote!{
-            < #(#type_arguments),* >
-          }
-        };
+            let type_arguments = reorder_type_arguments(type_args(msg));
+            let type_arg_toks = if type_arguments.is_empty() {
+                quote! {}
+            } else {
+                quote! {
+                  < #(#type_arguments),* >
+                }
+            };
 
-        quote! {
-          pub fn #fn_ident #type_arg_toks(self, input: #msg) -> #machine_name {
-            match self {
-              #(#mv)*
-              _ => #machine_name::Error,
+            quote! {
+              pub fn #fn_ident #type_arg_toks(self, input: #msg) -> #machine_name {
+                match self {
+                  #(#mv)*
+                  _ => #machine_name::Error,
+                }
+              }
             }
-          }
-        }
-      })
-    .collect::<Vec<_>>();
+        })
+        .collect::<Vec<_>>();
 
     let matches = messages
-      .keys()
-      .map(|msg| {
-        let fn_ident = Ident::new(
-          //&format!("on_{}", &msg.to_string().to_snake()),
-          &format!("on_{}", type_to_snake(msg)),
-          Span::call_site(),
-          );
+        .keys()
+        .map(|msg| {
+            let fn_ident = Ident::new(
+                //&format!("on_{}", &msg.to_string().to_snake()),
+                &format!("on_{}", type_to_snake(msg)),
+                proc_macro2::Span::call_site(),
+            );
 
-          let id = type_last_ident(msg);
+            let id = type_last_ident(msg);
 
-          quote!{
-            #message_enum_ident::#id(message) => self.#fn_ident(message),
-          }
-
-      })
-    .collect::<Vec<_>>();
+            quote! {
+              #message_enum_ident::#id(message) => self.#fn_ident(message),
+            }
+        })
+        .collect::<Vec<_>>();
 
     /*let type_arg_toks = if type_arguments.is_empty() {
       quote!{}
@@ -815,12 +821,15 @@ pub fn transitions(input: proc_macro::TokenStream) -> syn::export::TokenStream {
       }
     };
 
-    stream.extend(proc_macro::TokenStream::from(toks));
+    stream.extend(proc_macro2::TokenStream::from(toks));
 
     //println!("generated: {:?}", gen);
     trace!("generated transitions: {}", stream);
     let _ = create_dir("target/machine");
-    let file_name = format!("target/machine/{}.rs", machine_name.to_string().to_lowercase());
+    let file_name = format!(
+        "target/machine/{}.rs",
+        machine_name.to_string().to_lowercase()
+    );
     OpenOptions::new()
         .create(true)
         .write(true)
@@ -832,15 +841,18 @@ pub fn transitions(input: proc_macro::TokenStream) -> syn::export::TokenStream {
         })
         .expect("error writing transitions");
 
-    stream
+    proc_macro::TokenStream::from(stream)
 }
 
 #[proc_macro]
-pub fn methods(input: proc_macro::TokenStream) -> syn::export::TokenStream {
+pub fn methods(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     //println!("\ninput: {:?}", input);
+    let input = proc_macro2::TokenStream::from(input);
+
     let mut stream = proc_macro::TokenStream::new();
 
-    let methods = parse_macro_input!(input as Methods);
+    let methods: Methods = syn::parse2(input).expect("Could not parse methods");
+
     trace!("\nparsed methods: {:#?}", methods);
 
     let mut h = HashMap::new();
@@ -864,8 +876,10 @@ pub fn methods(input: proc_macro::TokenStream) -> syn::export::TokenStream {
                         }
                     }
                     MethodType::Set(ident, ty) => {
-                        let mut_ident =
-                            Ident::new(&format!("{}_mut", &ident.to_string()), Span::call_site());
+                        let mut_ident = Ident::new(
+                            &format!("{}_mut", &ident.to_string()),
+                            proc_macro2::Span::call_site(),
+                        );
                         quote! {
                           pub fn #mut_ident(&mut self) -> &mut #ty {
                             &mut self.#ident
@@ -914,8 +928,10 @@ pub fn methods(input: proc_macro::TokenStream) -> syn::export::TokenStream {
                 }
             }
             MethodType::Set(ident, ty) => {
-                let mut_ident =
-                    Ident::new(&format!("{}_mut", &ident.to_string()), Span::call_site());
+                let mut_ident = Ident::new(
+                    &format!("{}_mut", &ident.to_string()),
+                    proc_macro2::Span::call_site(),
+                );
 
                 let variants = method
                     .states
@@ -938,18 +954,17 @@ pub fn methods(input: proc_macro::TokenStream) -> syn::export::TokenStream {
             MethodType::Fn(m) => {
                 let ident = &m.ident;
                 let args = m
-                    .decl
                     .inputs
                     .iter()
                     .filter(|arg| match arg {
-                        FnArg::Captured(_) => true,
+                        FnArg::Typed(_) => true,
                         _ => false,
                     })
                     .map(|arg| {
-                        if let FnArg::Captured(a) = arg {
+                        if let FnArg::Typed(a) = arg {
                             &a.pat
                         } else {
-                            panic!();
+                            panic!("Something about the method type");
                         }
                     })
                     .collect::<Vec<_>>();
@@ -971,8 +986,8 @@ pub fn methods(input: proc_macro::TokenStream) -> syn::export::TokenStream {
                     })
                     .collect::<Vec<_>>();
 
-                let inputs = &m.decl.inputs;
-                let output = match &m.decl.output {
+                let inputs = &m.inputs;
+                let output = match &m.output {
                     ReturnType::Default => quote! {},
                     ReturnType::Type(arrow, ty) => {
                         if method.default.is_default() {
@@ -1031,7 +1046,10 @@ pub fn methods(input: proc_macro::TokenStream) -> syn::export::TokenStream {
 
     stream.extend(proc_macro::TokenStream::from(toks));
 
-    let file_name = format!("target/machine/{}.rs", machine_name.to_string().to_lowercase());
+    let file_name = format!(
+        "target/machine/{}.rs",
+        machine_name.to_string().to_lowercase()
+    );
     let _ = create_dir("target/machine");
     OpenOptions::new()
         .create(true)
@@ -1064,7 +1082,7 @@ struct Method {
 enum MethodType {
     Get(Ident, Type),
     Set(Ident, Type),
-    Fn(MethodSig),
+    Fn(Signature),
 }
 
 #[derive(Debug)]
@@ -1181,7 +1199,7 @@ impl Parse for Method {
     }
 }
 
-fn parse_method_sig(input: ParseStream) -> Result<MethodSig> {
+fn parse_method_sig(input: ParseStream) -> Result<Signature> {
     //let vis: Visibility = input.parse()?;
     let constness: Option<Token![const]> = input.parse()?;
     let unsafety: Option<Token![unsafe]> = input.parse()?;
@@ -1198,87 +1216,71 @@ fn parse_method_sig(input: ParseStream) -> Result<MethodSig> {
     let output: ReturnType = input.parse()?;
     let where_clause: Option<WhereClause> = input.parse()?;
 
-    Ok(MethodSig {
+    Ok(Signature {
         constness,
         unsafety,
         asyncness,
         abi,
         ident,
-        decl: FnDecl {
-            fn_token: fn_token,
-            paren_token: paren_token,
-            inputs: inputs,
-            output: output,
-            variadic: None,
-            generics: Generics {
-                where_clause: where_clause,
-                ..generics
-            },
+        fn_token: fn_token,
+        paren_token: paren_token,
+        inputs: inputs,
+        output: output,
+        variadic: None,
+        generics: Generics {
+            where_clause: where_clause,
+            ..generics
         },
     })
 }
 
 fn type_to_snake(t: &Type) -> String {
-  match t {
-    Type::Path(ref p) => {
-      match p.path.segments.last() {
-        Some(Pair::End(segment)) => {
-          segment.ident.to_string().to_snake()
+    match t {
+        Type::Path(ref p) => match p.path.segments.last() {
+            Some(segment) => segment.ident.to_string().to_snake(),
+            _ => panic!("expected a path segment"),
         },
-        _ => panic!("expected a path segment"),
-      }
-    },
-    t => panic!("expected a Type::Path, got {:?}", t),
-  }
+        t => panic!("expected a Type::Path, got {:?}", t),
+    }
 }
 
 fn type_last_ident(t: &Type) -> &Ident {
-  match t {
-    Type::Path(ref p) => {
-      match p.path.segments.last() {
-        Some(Pair::End(segment)) => {
-          &segment.ident
+    match t {
+        Type::Path(ref p) => match p.path.segments.last() {
+            Some(segment) => &segment.ident,
+            _ => panic!("expected a path segment"),
         },
-        _ => panic!("expected a path segment"),
-      }
-    },
-    t => panic!("expected a Type::Path, got {:?}", t),
-  }
+        t => panic!("expected a Type::Path, got {:?}", t),
+    }
 }
 
 fn type_args(t: &Type) -> HashSet<GenericArgument> {
-  match t {
-    Type::Path(ref p) => {
-      match p.path.segments.last() {
-        Some(Pair::End(segment)) => {
-          match &segment.arguments {
-            PathArguments::AngleBracketed(a) => {
-              a.args.iter().cloned().collect()
+    match t {
+        Type::Path(ref p) => match p.path.segments.last() {
+            Some(segment) => match &segment.arguments {
+                PathArguments::AngleBracketed(a) => a.args.iter().cloned().collect(),
+                PathArguments::None => HashSet::new(),
+                a => panic!("expected angle bracketed arguments, got {:?}", a),
             },
-            PathArguments::None => HashSet::new(),
-            a => panic!("expected angle bracketed arguments, got {:?}", a),
-          }
+            _ => panic!("expected a path segment"),
         },
-        _ => panic!("expected a path segment"),
-      }
-    },
-    t => panic!("expected a Type::Path, got {:?}", t),
-  }
+        t => panic!("expected a Type::Path, got {:?}", t),
+    }
 }
 
 // lifetimes must appear before other type arguments
 fn reorder_type_arguments(mut t: HashSet<GenericArgument>) -> Vec<GenericArgument> {
-  let mut lifetimes = Vec::new();
-  let mut others = Vec::new();
+    let mut lifetimes = Vec::new();
+    let mut others = Vec::new();
 
-  for arg in t.drain() {
-    if let GenericArgument::Lifetime(_) = arg {
-      lifetimes.push(arg);
-    } else {
-      others.push(arg);
+    for arg in t.drain() {
+        if let GenericArgument::Lifetime(_) = arg {
+            lifetimes.push(arg);
+        } else {
+            others.push(arg);
+        }
     }
-  }
 
-  lifetimes.extend(others.drain(..));
-  lifetimes
+    lifetimes.extend(others.drain(..));
+    lifetimes
 }

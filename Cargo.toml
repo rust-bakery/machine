@@ -8,6 +8,7 @@ license     = "MIT/Apache-2.0"
 repository  = "https://github.com/rust-bakery/machine"
 readme      = "./README.md"
 keywords    = ["state", "state-machine"]
+edition = "2018"
 
 include = [
   "LICENSE-APACHE",
@@ -17,10 +18,11 @@ include = [
   "tests/*.rs"
 ]
 [dependencies]
-syn = {version = "^0.15", features = ["full", "extra-traits"] }
-quote = "^0.6"
+syn = {version = "^1", features = ["full", "extra-traits", "parsing"] }
+quote = "^1"
 log = "^0.4"
 case = "^1.0"
+proc-macro2 = "^1"
 
 [lib]
 proc-macro = true
